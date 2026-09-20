@@ -59,7 +59,7 @@ class Config:
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
     telegram_auto_send: bool = False
-    github_repository: str = "zhangbaio/hongguo-downloader"
+    github_repository: str = "theournpheakdey/DeepXII-Tools"
 
     CONFIG_DIR: ClassVar[Path] = CONFIG_DIR_PATH
     CONFIG_FILE: ClassVar[Path] = CONFIG_FILE_PATH
@@ -107,7 +107,7 @@ class Config:
             telegram_bot_token=str(data.get("telegram_bot_token", "")),
             telegram_chat_id=str(data.get("telegram_chat_id", "")),
             telegram_auto_send=_coerce_bool(data.get("telegram_auto_send")),
-            github_repository=str(data.get("github_repository") or "zhangbaio/hongguo-downloader"),
+            github_repository=str(data.get("github_repository") or "theournpheakdey/DeepXII-Tools"),
         )
 
         stored = {
@@ -121,7 +121,7 @@ class Config:
             "telegram_bot_token": data.get("telegram_bot_token", ""),
             "telegram_chat_id": data.get("telegram_chat_id", ""),
             "telegram_auto_send": _coerce_bool(data.get("telegram_auto_send")),
-            "github_repository": data.get("github_repository") or "zhangbaio/hongguo-downloader",
+            "github_repository": data.get("github_repository") or "theournpheakdey/DeepXII-Tools",
         }
         if (
             needs_save

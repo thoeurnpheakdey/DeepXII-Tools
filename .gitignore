@@ -6,3 +6,5 @@ build/
 dist/
 *.spec.bak
 .env
+third_party/
+release/

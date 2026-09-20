@@ -13,7 +13,7 @@ import requests
 from version import APP_VERSION
 
 
-DEFAULT_GITHUB_REPOSITORY = "zhangbaio/hongguo-downloader"
+DEFAULT_GITHUB_REPOSITORY = "theournpheakdey/DeepXII-Tools"
 
 
 @dataclass(frozen=True)
