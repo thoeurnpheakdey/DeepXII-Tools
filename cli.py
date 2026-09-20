@@ -27,6 +27,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from config import Config, MAX_CONCURRENT, MIN_CONCURRENT  # noqa: E402
 from core.api_client import HonguoClient  # noqa: E402
 from core.aria2_manager import Aria2Manager  # noqa: E402
+from core.public_catalog import search_catalog  # noqa: E402
 
 
 POLL_INTERVAL = 0.5
@@ -156,6 +157,7 @@ class DownloadContext:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    _configure_console_encoding()
     parser = _build_parser()
     args = parser.parse_args(argv)
     handler = getattr(args, "handler", None)
@@ -206,6 +208,22 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     download_parser.set_defaults(handler=_command_download)
 
+    batch_parser = subparsers.add_parser("batch", help="批量下载多个剧目")
+    batch_parser.add_argument("book_ids", nargs="*", help="一个或多个 book_id")
+    batch_parser.add_argument(
+        "--file",
+        help="批量文件；每行格式为 book_id|剧名|集数（剧名和集数可省略）",
+    )
+    batch_parser.add_argument(
+        "--episodes",
+        default="all",
+        help="命令行 book_id 的剧集范围，例如 all 或 1,3,5-10",
+    )
+    batch_parser.add_argument("--quality", choices=["1080P+", "720P", "480P"], help="清晰度")
+    batch_parser.add_argument("--dir", help="保存目录，默认读取配置")
+    batch_parser.add_argument("--concurrent", type=int, help="每个剧目的并发任务数")
+    batch_parser.set_defaults(handler=_command_batch)
+
     config_parser = subparsers.add_parser("config", help="查看或更新配置")
     config_parser.add_argument("--key", help="授权 Key")
     config_parser.add_argument("--dir", help="下载目录")
@@ -217,12 +235,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _command_search(args: argparse.Namespace) -> int:
-    config = Config.load()
-    client = HonguoClient(config)
-    ok, results, msg = client.search(args.keyword, page=max(1, args.page))
-    if not ok:
-        print(f"搜索失败: {msg}")
+    try:
+        all_results = search_catalog(args.keyword)
+    except RuntimeError as exc:
+        print(f"搜索失败: {exc}")
         return 1
+    page = max(1, args.page)
+    page_size = 50
+    results = all_results[(page - 1) * page_size:page * page_size]
     if not results:
         print("未找到匹配剧目。")
         return 0
@@ -413,6 +433,80 @@ def _command_download(args: argparse.Namespace) -> int:
             print(f"- {result.label}: {result.message}")
         return 1
     return 0
+
+
+@dataclass
+class BatchItem:
+    book_id: str
+    title: Optional[str] = None
+    episodes: str = "all"
+
+
+def _command_batch(args: argparse.Namespace) -> int:
+    try:
+        items = _load_batch_items(args.book_ids, args.file, args.episodes)
+    except (OSError, ValueError) as exc:
+        print(f"读取批量任务失败: {exc}")
+        return 2
+
+    if not items:
+        print("请提供至少一个 book_id，或使用 --file 指定批量文件。")
+        return 2
+
+    failures: List[str] = []
+    print(f"准备下载 {len(items)} 个剧目。")
+    for index, item in enumerate(items, start=1):
+        print(f"\n=== [{index}/{len(items)}] {item.title or item.book_id} ===")
+        download_args = argparse.Namespace(
+            book_id=item.book_id,
+            title=item.title,
+            episodes=item.episodes,
+            quality=args.quality,
+            dir=args.dir,
+            concurrent=args.concurrent,
+        )
+        if _command_download(download_args) != 0:
+            failures.append(item.book_id)
+
+    succeeded = len(items) - len(failures)
+    print(f"\n批量任务完成: {succeeded}/{len(items)} 个剧目成功。")
+    if failures:
+        print("失败的 book_id: " + ", ".join(failures))
+        return 1
+    return 0
+
+
+def _load_batch_items(
+    book_ids: Sequence[str],
+    file_path: Optional[str],
+    default_episodes: str,
+) -> List[BatchItem]:
+    items = [
+        BatchItem(book_id=value.strip(), episodes=default_episodes)
+        for value in book_ids
+        if value.strip()
+    ]
+    if file_path:
+        path = Path(file_path).expanduser()
+        for line_number, raw_line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), start=1):
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = [part.strip() for part in line.split("|", 2)]
+            if not parts[0]:
+                raise ValueError(f"第 {line_number} 行缺少 book_id")
+            title = parts[1] if len(parts) > 1 and parts[1] else None
+            episodes = parts[2] if len(parts) > 2 and parts[2] else default_episodes
+            items.append(BatchItem(parts[0], title, episodes))
+
+    # Preserve the first occurrence so a repeated ID is not downloaded twice.
+    unique: List[BatchItem] = []
+    seen: Set[str] = set()
+    for item in items:
+        if item.book_id not in seen:
+            seen.add(item.book_id)
+            unique.append(item)
+    return unique
 
 
 @dataclass
@@ -691,6 +785,17 @@ def _enable_ansi_escape() -> bool:
         return True
     except Exception:  # pylint: disable=broad-except
         return False
+
+
+def _configure_console_encoding() -> None:
+    """Keep Chinese titles and status messages printable on Windows consoles."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, OSError):
+                pass
 
 
 if __name__ == "__main__":

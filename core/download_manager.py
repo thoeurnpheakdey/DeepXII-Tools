@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import requests
-from PySide6.QtCore import QObject, Signal
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from config import Config
 from .api_client import HonguoClient
@@ -46,8 +46,8 @@ class _DownloadCancelled(Exception):
 
 
 class DownloadManager(QObject):
-    task_updated = Signal(str, str)
-    queue_changed = Signal()
+    task_updated = pyqtSignal(str, str)
+    queue_changed = pyqtSignal()
 
     def __init__(self, config: Config, client: HonguoClient, aria2: Aria2Manager) -> None:
         super().__init__()

@@ -1,0 +1,59 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build application
+        shell: pwsh
+        run: |
+          $releaseVersion = "${{ github.ref_name }}".TrimStart('v')
+          (Get-Content version.py) -replace 'APP_VERSION = ".*"', "APP_VERSION = `"$releaseVersion`"" | Set-Content -Encoding utf8 version.py
+          pyinstaller --clean --noconfirm build_windows.spec
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $releaseVersion = "${{ github.ref_name }}".TrimStart('v')
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$releaseVersion" installer.iss
+
+      - name: Create checksum
+        shell: pwsh
+        run: |
+          $installer = "release\DeepXII-Tools-Setup.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLower()
+          "$hash  DeepXII-Tools-Setup.exe" | Set-Content -Encoding ascii "release\DeepXII-Tools-Setup.exe.sha256"
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "DeepXII Tools $tag" --generate-notes
+          }
+          gh release upload $tag "release\DeepXII-Tools-Setup.exe" "release\DeepXII-Tools-Setup.exe.sha256" --clobber
