@@ -7,7 +7,7 @@ from typing import Any
 
 import requests
 
-from PyQt6.QtCore import (QEasingCurve, QObject, QProcess, QPropertyAnimation, QRunnable,
+from PyQt6.QtCore import (QObject, QProcess, QRunnable,
                          QSize, Qt, QThreadPool, QTimer, QUrl, pyqtSignal, pyqtSlot)
 from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QButtonGroup, QCheckBox, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QComboBox,
     QProgressBar, QProgressDialog, QPushButton, QScrollArea, QSpinBox, QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QApplication, QGraphicsOpacityEffect, QVBoxLayout, QWidget,
+    QApplication, QVBoxLayout, QWidget,
 )
 
 from config import Config, DEFAULT_DOWNLOAD_DIR
@@ -315,7 +315,6 @@ class ModernWindow(QMainWindow):
         self.catalog_category = "all"
         self.telegram_uploading: set[str] = set()
         self.telegram_sent: set[str] = set()
-        self.page_animation: QPropertyAnimation | None = None
         self.library_thumbnail_labels: dict[str, list[QLabel]] = {}
         self.library_thumbnail_pending: set[str] = set()
         self.resize_timer = QTimer(self)
@@ -354,17 +353,6 @@ class ModernWindow(QMainWindow):
         self.content_layout.addWidget(self.pages, 1)
         root_layout.addWidget(content, 1)
         self.setCentralWidget(root)
-
-    def _animate_page(self, page: QWidget) -> None:
-        effect = QGraphicsOpacityEffect(page)
-        page.setGraphicsEffect(effect)
-        animation = QPropertyAnimation(effect, b"opacity", page)
-        animation.setDuration(200)
-        animation.setStartValue(0.45)
-        animation.setEndValue(1.0)
-        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self.page_animation = animation
-        animation.start()
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QFrame()
@@ -984,8 +972,20 @@ class ModernWindow(QMainWindow):
                   ("My Library", "Browse and play downloaded videos"),
                   ("Settings", "Manage local preferences"),
                   ("Donate Admin", "Support the development of DeepXII Tools")]
+        if not 0 <= index < self.pages.count():
+            return
+        # Opacity effects on QStackedWidget pages can leave the previous page's
+        # backing-store cache visible below transparent scroll areas. Clear any
+        # legacy effect and explicitly expose only the selected page.
+        for page_index in range(self.pages.count()):
+            page = self.pages.widget(page_index)
+            page.setGraphicsEffect(None)
+            page.setVisible(page_index == index)
         self.pages.setCurrentIndex(index)
-        self._animate_page(self.pages.widget(index))
+        current_page = self.pages.widget(index)
+        current_page.show()
+        current_page.raise_()
+        current_page.update()
         self.page_title.setText(self._t(titles[index][0]))
         self.page_subtitle.setText(self._t(titles[index][1]))
         self.nav_buttons[index].setChecked(True)
