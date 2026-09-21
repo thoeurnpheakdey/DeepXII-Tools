@@ -15,7 +15,7 @@ import psutil
 
 
 class Aria2Manager:
-    def __init__(self, config: Optional["Config"] = None, rpc_port: int = 6800) -> None:
+    def __init__(self, config: Optional["Config"] = None, rpc_port: int = 16800) -> None:
         self.rpc_port = rpc_port
         self.rpc_host = "http://localhost"
         self.rpc_secret = ""
@@ -78,7 +78,17 @@ class Aria2Manager:
             "--rpc-listen-all=false",
             "--max-connection-per-server=16",
             "--split=16",
+            "--min-split-size=1M",
+            "--piece-length=1M",
+            "--file-allocation=none",
+            "--disk-cache=64M",
+            "--stream-piece-selector=geom",
+            "--connect-timeout=15",
+            "--timeout=60",
+            "--lowest-speed-limit=10K",
             "--http-accept-gzip=true",
+            "--http-no-cache=true",
+            "--reuse-uri=true",
             "--allow-overwrite=true",
             "--auto-file-renaming=false",
         ]
@@ -136,6 +146,17 @@ class Aria2Manager:
         options = {
             "dir": str(target_dir),
             "user-agent": ua,
+            "continue": "true",
+            "split": "16",
+            "max-connection-per-server": "16",
+            "min-split-size": "1M",
+            "piece-length": "1M",
+            "file-allocation": "none",
+            "stream-piece-selector": "geom",
+            "max-tries": "3",
+            "retry-wait": "2",
+            "connect-timeout": "15",
+            "timeout": "60",
         }
         if filename:
             options["out"] = filename
@@ -176,10 +197,10 @@ class Aria2Manager:
         )
         return status
 
-    def remove(self, gid: str) -> None:
+    def remove(self, gid: str, delete_files: bool = True) -> None:
         try:
             download = self._get_api().get_download(gid)
-            self._get_api().remove([download], force=True, files=True)
+            self._get_api().remove([download], force=True, files=delete_files)
         except ConnectionError:
             return
         except Exception:

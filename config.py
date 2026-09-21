@@ -14,6 +14,7 @@ CONFIG_FILE_PATH = CONFIG_DIR_PATH / "config.json"
 DEFAULT_DOWNLOAD_DIR = Path.home() / "Downloads" / "红果下载"
 DEFAULT_LEVEL = "1080P+"
 DEFAULT_THEME = "light"
+DEFAULT_LANGUAGE = "en"
 MIN_CONCURRENT = 1
 MAX_CONCURRENT = 10
 
@@ -56,6 +57,7 @@ class Config:
     use_motrix: bool = False
     level: str = DEFAULT_LEVEL
     theme: str = DEFAULT_THEME
+    language: str = DEFAULT_LANGUAGE
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
     telegram_auto_send: bool = False
@@ -72,6 +74,9 @@ class Config:
         self.theme = str(self.theme or DEFAULT_THEME).strip().lower()
         if self.theme not in {"light", "dark"}:
             self.theme = DEFAULT_THEME
+        self.language = str(self.language or DEFAULT_LANGUAGE).strip().lower()
+        if self.language not in {"en", "km"}:
+            self.language = DEFAULT_LANGUAGE
 
     @property
     def is_key_set(self) -> bool:
@@ -104,6 +109,7 @@ class Config:
             use_motrix=_coerce_bool(data.get("use_motrix")),
             level=data.get("level") or DEFAULT_LEVEL,
             theme=data.get("theme") or DEFAULT_THEME,
+            language=data.get("language") or DEFAULT_LANGUAGE,
             telegram_bot_token=str(data.get("telegram_bot_token", "")),
             telegram_chat_id=str(data.get("telegram_chat_id", "")),
             telegram_auto_send=_coerce_bool(data.get("telegram_auto_send")),
@@ -118,6 +124,7 @@ class Config:
             "use_motrix": _coerce_bool(data.get("use_motrix")),
             "level": data.get("level") or DEFAULT_LEVEL,
             "theme": data.get("theme") or DEFAULT_THEME,
+            "language": data.get("language") or DEFAULT_LANGUAGE,
             "telegram_bot_token": data.get("telegram_bot_token", ""),
             "telegram_chat_id": data.get("telegram_chat_id", ""),
             "telegram_auto_send": _coerce_bool(data.get("telegram_auto_send")),
@@ -131,6 +138,7 @@ class Config:
             or stored["use_motrix"] != config.use_motrix
             or stored["level"] != config.level
             or stored["theme"] != config.theme
+            or stored["language"] != config.language
             or stored["telegram_bot_token"] != config.telegram_bot_token
             or stored["telegram_chat_id"] != config.telegram_chat_id
             or stored["telegram_auto_send"] != config.telegram_auto_send
@@ -148,6 +156,7 @@ class Config:
             "use_motrix": self.use_motrix,
             "level": self.level,
             "theme": self.theme,
+            "language": self.language,
             "telegram_bot_token": self.telegram_bot_token,
             "telegram_chat_id": self.telegram_chat_id,
             "telegram_auto_send": self.telegram_auto_send,

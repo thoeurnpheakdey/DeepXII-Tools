@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 import re
 import time
 from pathlib import Path
@@ -8,21 +7,99 @@ from typing import Any
 
 import requests
 
-from PyQt6.QtCore import QObject, QProcess, QRunnable, QSize, Qt, QThreadPool, QTimer, QUrl, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import (QEasingCurve, QObject, QProcess, QPropertyAnimation, QRunnable,
+                         QSize, Qt, QThreadPool, QTimer, QUrl, pyqtSignal, pyqtSlot)
 from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QButtonGroup, QCheckBox, QDialog, QFileDialog, QFrame, QGridLayout,
-    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox,
-    QProgressBar, QProgressDialog, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QApplication, QVBoxLayout, QWidget,
+    QAbstractItemView, QButtonGroup, QCheckBox, QFileDialog, QFrame, QGridLayout,
+    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QComboBox,
+    QProgressBar, QProgressDialog, QPushButton, QScrollArea, QSpinBox, QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QApplication, QGraphicsOpacityEffect, QVBoxLayout, QWidget,
 )
 
 from config import Config, DEFAULT_DOWNLOAD_DIR
 from core.aria2_manager import Aria2Manager
 from core.download_manager import DownloadManager
+from core.library_manager import LibraryDrama, scan_library, video_thumbnail
 from core.public_catalog import search_catalog
 from core.update_manager import APP_VERSION, ReleaseInfo, check_latest_release, download_release
+
+KHMER_TRANSLATIONS = {
+    "Discover": "ស្វែងរក",
+    "My Queue": "បញ្ជីទាញយក",
+    "My Library": "បណ្ណាល័យរបស់ខ្ញុំ",
+    "Settings": "ការកំណត់",
+    "Donate Admin": "ឧបត្ថម្ភ Admin",
+    "Update Tools": "អាប់ដេតកម្មវិធី",
+    "YouTube": "YouTube",
+    "Telegram": "Telegram",
+    "Website": "គេហទំព័រ",
+    "CONTACT": "ទំនាក់ទំនង",
+    "PUBLIC MODE": "របៀបសាធារណៈ",
+    "PUBLIC CATALOGUE": "បញ្ជីរឿងសាធារណៈ",
+    "Live search is ready. Downloads activate with an authorized endpoint.": "ការស្វែងរកបានត្រៀមរួច។ ការទាញយកអាស្រ័យលើសិទ្ធិ API។",
+    "CATALOG": "បញ្ជីរឿង",
+    "Explore the public Hongguo catalogue": "ស្វែងរករឿងក្នុងបញ្ជីសាធារណៈ Hongguo",
+    "Review dramas prepared for download": "ពិនិត្យរឿងដែលត្រៀមទាញយក",
+    "Browse and play downloaded videos": "មើល និងចាក់វីដេអូដែលបានទាញយក",
+    "Manage local preferences": "គ្រប់គ្រងការកំណត់កម្មវិធី",
+    "Support the development of DeepXII Tools": "គាំទ្រការអភិវឌ្ឍ DeepXII Tools",
+    "Search catalogue": "ស្វែងរករឿង",
+    "Search a Chinese drama title…": "ស្វែងរកចំណងជើងរឿងចិន…",
+    "Add selected to queue": "បន្ថែមរឿងដែលបានជ្រើសទៅបញ្ជី",
+    "Search downloaded dramas…": "ស្វែងរករឿងដែលបានទាញយក…",
+    "Newest": "ថ្មីបំផុត",
+    "Name": "ឈ្មោះ",
+    "Most episodes": "ភាគច្រើនបំផុត",
+    "Largest size": "ទំហំធំបំផុត",
+    "Refresh": "ផ្ទុកឡើងវិញ",
+    "Open download folder": "បើកថតទាញយក",
+    "Download folder": "ថតទាញយក",
+    "Concurrent episodes": "ចំនួនភាគទាញយកព្រមគ្នា",
+    "Preferred quality": "គុណភាពវីដេអូ",
+    "Authorized API key": "API Key ដែលបានអនុញ្ញាត",
+    "API status": "ស្ថានភាព API",
+    "Telegram Bot Token": "Telegram Bot Token",
+    "Telegram Group": "ក្រុម Telegram",
+    "Auto-send videos": "ផ្ញើវីដេអូដោយស្វ័យប្រវត្តិ",
+    "GitHub repository": "GitHub repository",
+    "Browse": "ជ្រើសរើស",
+    "Save preferences": "រក្សាទុកការកំណត់",
+    "Clear queue": "សម្អាតបញ្ជី",
+    "Pause": "ផ្អាក",
+    "Resume": "បន្ត",
+    "Retry failed": "សាកល្បងឡើងវិញ",
+    "Cancel": "បោះបង់",
+    "Download all": "ទាញយកទាំងអស់",
+    "Start": "ចាប់ផ្ដើម",
+    "Remove": "ដកចេញ",
+    "View Folder": "មើលថត",
+    "COMPLETED VIDEOS": "វីដេអូដែលបានទាញយករួច",
+    "File size": "ទំហំឯកសារ",
+    "Completed": "រួចរាល់",
+    "Drama": "រឿង",
+    "Episodes": "ចំនួនភាគ",
+    "Episode range": "ជួរភាគ",
+    "Series ID": "លេខសម្គាល់រឿង",
+    "Progress": "ដំណើរការ",
+    "Status": "ស្ថានភាព",
+    "Actions": "សកម្មភាព",
+    "Folder": "ថត",
+    "Delete": "លុប",
+    "Play": "ចាក់",
+    "Dark": "ងងឹត",
+    "Light": "ភ្លឺ",
+    "Support DeepXII Tools": "គាំទ្រ DeepXII Tools",
+    "Scan the ABA PAY QR code below to donate to Nava Seal Digital.": "ស្កេន ABA PAY QR Code ខាងក្រោម ដើម្បីឧបត្ថម្ភ Nava Seal Digital។",
+    "Language": "ភាសា",
+    "English": "English",
+    "Khmer": "ខ្មែរ",
+    "Open @BotFather": "បើក @BotFather",
+    "Save Telegram": "រក្សាទុក Telegram",
+    "Automatically send every completed video": "ផ្ញើវីដេអូដែលទាញយករួចដោយស្វ័យប្រវត្តិ",
+    "Send each completed download to Telegram": "ផ្ញើវីដេអូដែលទាញយករួចទៅ Telegram",
+}
 
 
 class WorkerSignals(QObject):
@@ -67,13 +144,32 @@ class PrepareDownloadsWorker(QRunnable):
         try:
             added = 0
             for drama in self.dramas:
-                count = max(1, int(drama.get("download_count") or 1))
+                start = max(1, int(drama.get("download_start") or 1))
+                end = max(start, int(drama.get("download_end") or drama.get("download_count") or start))
                 added += self.manager.add_drama(
                     str(drama.get("book_id") or ""),
                     str(drama.get("title") or "Untitled drama"),
-                    f"1-{count}",
+                    f"{start}-{end}",
                 )
             self.signals.result.emit(added)
+        except Exception as exc:  # pylint: disable=broad-except
+            self.signals.error.emit(str(exc))
+        finally:
+            self.signals.finished.emit()
+
+
+class VideoThumbnailWorker(QRunnable):
+    def __init__(self, video: Path, key: str) -> None:
+        super().__init__()
+        self.video = video
+        self.key = key
+        self.signals = WorkerSignals()
+
+    @pyqtSlot()
+    def run(self) -> None:
+        try:
+            thumbnail = video_thumbnail(self.video)
+            self.signals.result.emit((self.key, str(thumbnail) if thumbnail else ""))
         except Exception as exc:  # pylint: disable=broad-except
             self.signals.error.emit(str(exc))
         finally:
@@ -181,7 +277,25 @@ class MetricCard(QFrame):
         self.value_label.setText(value)
 
 
+class QueueTable(QTableWidget):
+    reorder_requested = pyqtSignal(int, int)
+
+    def dropEvent(self, event) -> None:  # type: ignore[override]
+        source = self.currentRow()
+        target = self.indexAt(event.position().toPoint()).row()
+        if target < 0:
+            target = self.rowCount() - 1
+        if source >= 0 and target >= 0 and source != target:
+            self.reorder_requested.emit(source, target)
+            event.acceptProposedAction()
+            return
+        event.ignore()
+
+
 class ModernWindow(QMainWindow):
+    def _t(self, text: str) -> str:
+        return KHMER_TRANSLATIONS.get(text, text) if self.config.language == "km" else text
+
     def __init__(self, config: Config, download_manager: DownloadManager, aria2: Aria2Manager) -> None:
         super().__init__()
         self.config = config
@@ -189,6 +303,7 @@ class ModernWindow(QMainWindow):
         self.aria2 = aria2
         self.results: list[dict[str, Any]] = []
         self.queue: list[dict[str, Any]] = []
+        self.library_items: list[LibraryDrama] = []
         self.thread_pool = QThreadPool.globalInstance()
         self.image_manager = QNetworkAccessManager(self)
         self.image_manager.finished.connect(self._thumbnail_finished)
@@ -199,6 +314,9 @@ class ModernWindow(QMainWindow):
         self.catalog_category = "all"
         self.telegram_uploading: set[str] = set()
         self.telegram_sent: set[str] = set()
+        self.page_animation: QPropertyAnimation | None = None
+        self.library_thumbnail_labels: dict[str, list[QLabel]] = {}
+        self.library_thumbnail_pending: set[str] = set()
         self.resize_timer = QTimer(self)
         self.resize_timer.setSingleShot(True)
         self.resize_timer.timeout.connect(self._apply_responsive_layout)
@@ -207,6 +325,8 @@ class ModernWindow(QMainWindow):
         self.resize(1280, 790)
         self._build_ui()
         self.download_manager.task_updated.connect(self._on_download_updated)
+        self.download_manager.queue_changed.connect(self._restore_persisted_queue)
+        self._restore_persisted_queue()
         self._show_page(0)
         QTimer.singleShot(150, self._start_search)
 
@@ -227,10 +347,23 @@ class ModernWindow(QMainWindow):
         self.pages = QStackedWidget()
         self.pages.addWidget(self._build_discover_page())
         self.pages.addWidget(self._build_queue_page())
+        self.pages.addWidget(self._build_library_page())
         self.pages.addWidget(self._build_settings_page())
+        self.pages.addWidget(self._build_donate_page())
         self.content_layout.addWidget(self.pages, 1)
         root_layout.addWidget(content, 1)
         self.setCentralWidget(root)
+
+    def _animate_page(self, page: QWidget) -> None:
+        effect = QGraphicsOpacityEffect(page)
+        page.setGraphicsEffect(effect)
+        animation = QPropertyAnimation(effect, b"opacity", page)
+        animation.setDuration(200)
+        animation.setStartValue(0.45)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.page_animation = animation
+        animation.start()
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QFrame()
@@ -263,12 +396,13 @@ class ModernWindow(QMainWindow):
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
         self.nav_buttons: list[QPushButton] = []
-        for text, index, role in (
-            ("⌕  Discover", 0, "discover"),
-            ("▤  My Queue", 1, "queue"),
-            ("⚙  Settings", 2, "settings"),
+        for icon, text, index, role in (
+            ("⌕", "Discover", 0, "discover"),
+            ("▤", "My Queue", 1, "queue"),
+            ("▶", "My Library", 2, "library"),
+            ("⚙", "Settings", 3, "settings"),
         ):
-            button = QPushButton(text)
+            button = QPushButton(f"{icon}  {self._t(text)}")
             button.setObjectName("navButton")
             button.setProperty("navRole", role)
             button.setCheckable(True)
@@ -276,41 +410,51 @@ class ModernWindow(QMainWindow):
             self.nav_group.addButton(button)
             self.nav_buttons.append(button)
             layout.addWidget(button)
-        self.update_button = QPushButton(f"↻  Update Tools  ·  v{APP_VERSION}")
+        self.update_button = QPushButton(f"↻  {self._t('Update Tools')}  ·  v{APP_VERSION}")
         self.update_button.setObjectName("updateButton")
         self.update_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.update_button.clicked.connect(self._check_for_updates)
         layout.addWidget(self.update_button)
         layout.addSpacing(18)
-        contact_label = QLabel("CONTACT")
+        contact_label = QLabel(self._t("CONTACT"))
         contact_label.setObjectName("contactLabel")
         layout.addWidget(contact_label)
-        youtube = QPushButton("▶  YouTube")
+        youtube = QPushButton(f"▶  {self._t('YouTube')}")
         youtube.setObjectName("youtubeButton")
         youtube.setCursor(Qt.CursorShape.PointingHandCursor)
         youtube.clicked.connect(
             lambda: QDesktopServices.openUrl(QUrl("https://www.youtube.com/@NavaSealDigital"))
         )
-        telegram = QPushButton("➤  Telegram")
+        telegram = QPushButton(f"➤  {self._t('Telegram')}")
         telegram.setObjectName("telegramButton")
         telegram.setCursor(Qt.CursorShape.PointingHandCursor)
         telegram.clicked.connect(
             lambda: QDesktopServices.openUrl(QUrl("https://t.me/NavasealDigital"))
         )
-        donate = QPushButton("♥  Donate Admin")
+        website = QPushButton(f"◆  {self._t('Website')}")
+        website.setObjectName("websiteButton")
+        website.setCursor(Qt.CursorShape.PointingHandCursor)
+        website.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://digital.navaseal.site"))
+        )
+        donate = QPushButton(f"♥  {self._t('Donate Admin')}")
         donate.setObjectName("donateButton")
         donate.setCursor(Qt.CursorShape.PointingHandCursor)
-        donate.clicked.connect(self._show_donate_dialog)
+        donate.setCheckable(True)
+        donate.clicked.connect(lambda _checked=False: self._show_page(4))
+        self.nav_group.addButton(donate)
+        self.nav_buttons.append(donate)
         layout.addWidget(youtube)
         layout.addWidget(telegram)
+        layout.addWidget(website)
         layout.addWidget(donate)
         layout.addStretch(1)
 
         info = QFrame()
         info.setObjectName("sideInfo")
         info_layout = QVBoxLayout(info)
-        info_layout.addWidget(QLabel("PUBLIC CATALOGUE"))
-        hint = QLabel("Live search is ready. Downloads activate with an authorized endpoint.")
+        info_layout.addWidget(QLabel(self._t("PUBLIC CATALOGUE")))
+        hint = QLabel(self._t("Live search is ready. Downloads activate with an authorized endpoint."))
         hint.setObjectName("muted")
         hint.setWordWrap(True)
         info_layout.addWidget(hint)
@@ -387,67 +531,7 @@ class ModernWindow(QMainWindow):
     @pyqtSlot()
     def _update_check_finished(self) -> None:
         self.update_button.setEnabled(True)
-        self.update_button.setText(f"↻  Update Tools  ·  v{APP_VERSION}")
-
-    def _show_donate_dialog(self) -> None:
-        qr_path = Path(__file__).resolve().parent.parent / "resources" / "donate_qr.png"
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Donate Admin")
-        dialog.setObjectName("donateDialog")
-        dialog.setMinimumSize(440, 600)
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(22, 22, 22, 22)
-        title = QLabel("Donate Admin")
-        title.setObjectName("donateTitle")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        image = QLabel()
-        image.setObjectName("donateImage")
-        image.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        image.setWordWrap(True)
-
-        def show_qr() -> bool:
-            pixmap = QPixmap(str(qr_path))
-            if pixmap.isNull():
-                image.setText("QR image has not been selected yet.\nClick ‘Choose QR image’ below.")
-                return False
-            image.setText("")
-            image.setPixmap(
-                pixmap.scaled(
-                    QSize(400, 520),
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            )
-            return True
-
-        def choose_qr() -> None:
-            selected, _ = QFileDialog.getOpenFileName(
-                dialog,
-                "Choose the original donation QR image",
-                "",
-                "Images (*.png *.jpg *.jpeg *.webp)",
-            )
-            if not selected:
-                return
-            try:
-                qr_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(selected, qr_path)
-            except OSError as exc:
-                QMessageBox.warning(dialog, "QR code unavailable", f"Could not save the QR image:\n{exc}")
-                return
-            show_qr()
-
-        show_qr()
-        choose = QPushButton("Choose QR image" if not qr_path.exists() else "Replace QR image")
-        choose.setObjectName("secondaryButton")
-        choose.clicked.connect(choose_qr)
-        close = QPushButton("Close")
-        close.clicked.connect(dialog.accept)
-        layout.addWidget(title)
-        layout.addWidget(image, 1)
-        layout.addWidget(choose)
-        layout.addWidget(close)
-        dialog.exec()
+        self.update_button.setText(f"↻  {self._t('Update Tools')}  ·  v{APP_VERSION}")
 
     def _build_header(self) -> QWidget:
         header = QWidget()
@@ -468,7 +552,7 @@ class ModernWindow(QMainWindow):
         self.theme_button.clicked.connect(self._toggle_theme)
         self._update_theme_button()
         layout.addWidget(self.theme_button)
-        badge = QLabel("●  PUBLIC MODE")
+        badge = QLabel(f"●  {self._t('PUBLIC MODE')}")
         badge.setObjectName("statusBadge")
         layout.addWidget(badge)
         return header
@@ -482,7 +566,9 @@ class ModernWindow(QMainWindow):
         self._update_theme_button()
 
     def _update_theme_button(self) -> None:
-        self.theme_button.setText("☾  Dark" if self.config.theme == "light" else "☀  Light")
+        self.theme_button.setText(
+            f"☾  {self._t('Dark')}" if self.config.theme == "light" else f"☀  {self._t('Light')}"
+        )
 
     def _build_discover_page(self) -> QWidget:
         page = QWidget()
@@ -502,10 +588,10 @@ class ModernWindow(QMainWindow):
         search_layout = QHBoxLayout(search_card)
         search_layout.setContentsMargins(18, 16, 18, 16)
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search a Chinese drama title…")
+        self.search_input.setPlaceholderText(self._t("Search a Chinese drama title…"))
         self.search_input.setClearButtonEnabled(True)
         self.search_input.returnPressed.connect(self._start_search)
-        self.search_button = QPushButton("Search catalogue")
+        self.search_button = QPushButton(self._t("Search catalogue"))
         self.search_button.setObjectName("primaryButton")
         self.search_button.clicked.connect(self._start_search)
         search_layout.addWidget(self.search_input, 1)
@@ -516,7 +602,7 @@ class ModernWindow(QMainWindow):
         catalog_widget.setObjectName("catalogBar")
         catalog_bar = QHBoxLayout(catalog_widget)
         catalog_bar.setContentsMargins(0, 0, 0, 0)
-        catalog_title = QLabel("▤  CATALOG")
+        catalog_title = QLabel(f"▤  {self._t('CATALOG')}")
         catalog_title.setObjectName("catalogTitle")
         catalog_bar.addWidget(catalog_title)
         self.catalog_group = QButtonGroup(self)
@@ -560,7 +646,7 @@ class ModernWindow(QMainWindow):
         footer = QHBoxLayout()
         self.search_status = QLabel("Enter a title, or leave it empty to show the latest catalogue.")
         self.search_status.setObjectName("muted")
-        self.add_queue_button = QPushButton("＋ Add selected to queue")
+        self.add_queue_button = QPushButton(f"＋ {self._t('Add selected to queue')}")
         self.add_queue_button.setObjectName("secondaryButton")
         self.add_queue_button.clicked.connect(self._add_selected_to_queue)
         footer.addWidget(self.search_status)
@@ -590,7 +676,7 @@ class ModernWindow(QMainWindow):
         telegram_title = QLabel("➤  TELEGRAM AUTO UPLOAD")
         telegram_title.setObjectName("telegramTitle")
         telegram_layout.addWidget(telegram_title, 0, 0, 1, 2)
-        create_bot = QPushButton("Open @BotFather")
+        create_bot = QPushButton(self._t("Open @BotFather"))
         create_bot.setObjectName("telegramButton")
         create_bot.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://t.me/BotFather")))
         telegram_layout.addWidget(create_bot, 0, 2)
@@ -604,10 +690,10 @@ class ModernWindow(QMainWindow):
         self.queue_telegram_group = QLineEdit(self.config.telegram_chat_id)
         self.queue_telegram_group.setPlaceholderText("https://t.me/groupname, @groupname, or -100…")
         telegram_layout.addWidget(self.queue_telegram_group, 2, 1, 1, 2)
-        self.queue_telegram_auto = QCheckBox("Automatically send every completed video")
+        self.queue_telegram_auto = QCheckBox(self._t("Automatically send every completed video"))
         self.queue_telegram_auto.setChecked(self.config.telegram_auto_send)
         telegram_layout.addWidget(self.queue_telegram_auto, 3, 1)
-        save_telegram = QPushButton("Save Telegram")
+        save_telegram = QPushButton(self._t("Save Telegram"))
         save_telegram.setObjectName("primaryButton")
         save_telegram.clicked.connect(self._save_queue_telegram)
         telegram_layout.addWidget(save_telegram, 3, 2)
@@ -617,24 +703,130 @@ class ModernWindow(QMainWindow):
         telegram_layout.setColumnStretch(1, 1)
         layout.addWidget(telegram_panel)
 
-        self.queue_table = self._new_table(["Drama", "Episodes", "Download", "Series ID", "Progress", "Status", "Actions"])
+        headers = [self._t(text) for text in ("Drama", "Episodes", "Episode range", "Series ID", "Progress", "Status", "Actions")]
+        self.queue_table = QueueTable(0, len(headers))
+        self.queue_table.setHorizontalHeaderLabels(headers)
+        self.queue_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.queue_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.queue_table.setAlternatingRowColors(True)
+        self.queue_table.verticalHeader().setVisible(False)
+        self.queue_table.verticalHeader().setDefaultSectionSize(48)
+        self.queue_table.setDragEnabled(True)
+        self.queue_table.setAcceptDrops(True)
+        self.queue_table.setDropIndicatorShown(True)
+        self.queue_table.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.queue_table.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.queue_table.reorder_requested.connect(self._reorder_queue)
         self.queue_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.queue_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
-        self.queue_table.setColumnWidth(2, 105)
+        self.queue_table.setColumnWidth(2, 175)
         self.queue_table.setColumnWidth(4, 180)
-        self.queue_table.setColumnWidth(6, 190)
-        layout.addWidget(self.queue_table, 1)
+        self.queue_table.setColumnWidth(6, 270)
+        self.queue_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.queue_splitter.setChildrenCollapsible(False)
+        self.queue_splitter.addWidget(self.queue_table)
+        completed_section = QWidget()
+        completed_layout = QVBoxLayout(completed_section)
+        completed_layout.setContentsMargins(0, 0, 0, 0)
+        completed_layout.setSpacing(6)
+        completed_title = QLabel(self._t("COMPLETED VIDEOS"))
+        completed_title.setObjectName("completedTitle")
+        completed_layout.addWidget(completed_title)
+        self.completed_table = self._new_table([
+            self._t("Drama"), self._t("Episodes"), self._t("File size"), self._t("Status"), self._t("Actions")
+        ])
+        self.completed_table.setObjectName("completedTable")
+        self.completed_table.horizontalHeader().setObjectName("completedHeader")
+        self.completed_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.completed_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.completed_table.setColumnWidth(2, 110)
+        self.completed_table.setColumnWidth(3, 100)
+        self.completed_table.setColumnWidth(4, 220)
+        self.completed_table.verticalHeader().setDefaultSectionSize(58)
+        self.completed_table.setMinimumHeight(150)
+        completed_layout.addWidget(self.completed_table, 1)
+        self.queue_splitter.addWidget(completed_section)
+        self.queue_splitter.setStretchFactor(0, 3)
+        self.queue_splitter.setStretchFactor(1, 2)
+        self.queue_splitter.setSizes([260, 190])
+        layout.addWidget(self.queue_splitter, 1)
+        self.queue_summary = QLabel("")
+        self.queue_summary.setObjectName("queueSummary")
+        layout.addWidget(self.queue_summary)
         controls = QHBoxLayout()
-        clear_button = QPushButton("Clear queue")
+        clear_button = QPushButton(self._t("Clear queue"))
+        clear_button.setObjectName("dangerButton")
         clear_button.clicked.connect(self._clear_queue)
-        self.download_button = QPushButton("Download all")
+        self.pause_button = QPushButton(self._t("Pause"))
+        self.pause_button.setObjectName("secondaryButton")
+        self.pause_button.clicked.connect(self._pause_downloads)
+        self.resume_button = QPushButton(self._t("Resume"))
+        self.resume_button.setObjectName("primaryButton")
+        self.resume_button.clicked.connect(self.download_manager.resume_all)
+        self.retry_button = QPushButton(self._t("Retry failed"))
+        self.retry_button.setObjectName("secondaryButton")
+        self.retry_button.clicked.connect(self.download_manager.retry_failed)
+        self.cancel_button = QPushButton(self._t("Cancel"))
+        self.cancel_button.setObjectName("dangerButton")
+        self.cancel_button.clicked.connect(self._cancel_downloads)
+        self.download_button = QPushButton(self._t("Download all"))
         self.download_button.setObjectName("primaryButton")
         self.download_button.setEnabled(False)
         self.download_button.clicked.connect(self._start_downloads)
         controls.addWidget(clear_button)
+        controls.addWidget(self.pause_button)
+        controls.addWidget(self.resume_button)
+        controls.addWidget(self.retry_button)
+        controls.addWidget(self.cancel_button)
         controls.addStretch(1)
         controls.addWidget(self.download_button)
         layout.addLayout(controls)
+        return page
+
+    def _build_library_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(14)
+
+        toolbar = QFrame()
+        toolbar.setObjectName("panel")
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(16, 12, 16, 12)
+        self.library_search = QLineEdit()
+        self.library_search.setPlaceholderText(self._t("Search downloaded dramas…"))
+        self.library_search.setClearButtonEnabled(True)
+        self.library_search.textChanged.connect(self._render_library)
+        self.library_sort = QComboBox()
+        for mode in ("Newest", "Name", "Most episodes", "Largest size"):
+            self.library_sort.addItem(self._t(mode), mode)
+        self.library_sort.currentIndexChanged.connect(self._render_library)
+        refresh = QPushButton(f"↻  {self._t('Refresh')}")
+        refresh.setObjectName("secondaryButton")
+        refresh.clicked.connect(self._refresh_library)
+        open_root = QPushButton(self._t("Open download folder"))
+        open_root.clicked.connect(lambda: self._open_path(Path(self.config.download_dir)))
+        toolbar_layout.addWidget(self.library_search, 1)
+        toolbar_layout.addWidget(self.library_sort)
+        toolbar_layout.addWidget(refresh)
+        toolbar_layout.addWidget(open_root)
+        layout.addWidget(toolbar)
+
+        self.library_summary = QLabel("No downloaded videos found.")
+        self.library_summary.setObjectName("muted")
+        layout.addWidget(self.library_summary)
+        self.library_scroll = QScrollArea()
+        self.library_scroll.setObjectName("catalogScroll")
+        self.library_scroll.setWidgetResizable(True)
+        self.library_container = QWidget()
+        self.library_container.setObjectName("catalogContainer")
+        self.library_grid = QGridLayout(self.library_container)
+        self.library_grid.setContentsMargins(8, 8, 8, 8)
+        self.library_grid.setHorizontalSpacing(14)
+        self.library_grid.setVerticalSpacing(14)
+        self.library_grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.library_scroll.setWidget(self.library_container)
+        layout.addWidget(self.library_scroll, 1)
         return page
 
     def _build_settings_page(self) -> QWidget:
@@ -655,58 +847,111 @@ class ModernWindow(QMainWindow):
         grid.setContentsMargins(24, 24, 24, 24)
         grid.setHorizontalSpacing(18)
         grid.setVerticalSpacing(16)
-        grid.addWidget(self._field_label("Download folder"), 0, 0)
+        grid.addWidget(self._field_label(self._t("Download folder")), 0, 0)
         self.folder_edit = QLineEdit(self.config.download_dir)
-        browse = QPushButton("Browse")
+        browse = QPushButton(self._t("Browse"))
         browse.clicked.connect(self._choose_folder)
         grid.addWidget(self.folder_edit, 0, 1)
         grid.addWidget(browse, 0, 2)
-        grid.addWidget(self._field_label("Concurrent episodes"), 1, 0)
+        grid.addWidget(self._field_label(self._t("Concurrent episodes")), 1, 0)
         self.concurrent_spin = QSpinBox()
         self.concurrent_spin.setRange(1, 10)
         self.concurrent_spin.setValue(self.config.concurrent)
         grid.addWidget(self.concurrent_spin, 1, 1)
-        grid.addWidget(self._field_label("Preferred quality"), 2, 0)
+        grid.addWidget(self._field_label(self._t("Preferred quality")), 2, 0)
         quality = QLineEdit(self.config.level)
         quality.setReadOnly(True)
         grid.addWidget(quality, 2, 1)
-        grid.addWidget(self._field_label("Authorized API key"), 3, 0)
+        grid.addWidget(self._field_label(self._t("Authorized API key")), 3, 0)
         self.api_key_edit = QLineEdit(self.config.key)
         self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.api_key_edit.setPlaceholderText("Enter a valid key for full episode access")
         self.api_key_edit.setClearButtonEnabled(True)
         grid.addWidget(self.api_key_edit, 3, 1, 1, 2)
-        grid.addWidget(self._field_label("API status"), 4, 0)
+        grid.addWidget(self._field_label(self._t("API status")), 4, 0)
         self.api_status = QLabel()
         self.api_status.setObjectName("warningText")
         self._update_api_status()
         grid.addWidget(self.api_status, 4, 1, 1, 2)
-        grid.addWidget(self._field_label("Telegram Bot Token"), 5, 0)
+        grid.addWidget(self._field_label(self._t("Telegram Bot Token")), 5, 0)
         self.telegram_token_edit = QLineEdit(self.config.telegram_bot_token)
         self.telegram_token_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.telegram_token_edit.setPlaceholderText("Token from @BotFather")
         self.telegram_token_edit.setClearButtonEnabled(True)
         grid.addWidget(self.telegram_token_edit, 5, 1, 1, 2)
-        grid.addWidget(self._field_label("Telegram Group"), 6, 0)
+        grid.addWidget(self._field_label(self._t("Telegram Group")), 6, 0)
         self.telegram_group_edit = QLineEdit(self.config.telegram_chat_id)
         self.telegram_group_edit.setPlaceholderText("https://t.me/groupname, @groupname, or numeric chat ID")
         grid.addWidget(self.telegram_group_edit, 6, 1, 1, 2)
-        grid.addWidget(self._field_label("Auto-send videos"), 7, 0)
-        self.telegram_auto_check = QCheckBox("Send each completed download to Telegram")
+        grid.addWidget(self._field_label(self._t("Auto-send videos")), 7, 0)
+        self.telegram_auto_check = QCheckBox(self._t("Send each completed download to Telegram"))
         self.telegram_auto_check.setChecked(self.config.telegram_auto_send)
         grid.addWidget(self.telegram_auto_check, 7, 1, 1, 2)
-        grid.addWidget(self._field_label("GitHub repository"), 8, 0)
+        grid.addWidget(self._field_label(self._t("GitHub repository")), 8, 0)
         self.github_repository_edit = QLineEdit(self.config.github_repository)
         self.github_repository_edit.setPlaceholderText("owner/repository")
         grid.addWidget(self.github_repository_edit, 8, 1, 1, 2)
-        save = QPushButton("Save preferences")
+        grid.addWidget(self._field_label(self._t("Language")), 9, 0)
+        self.language_combo = QComboBox()
+        self.language_combo.addItem(self._t("English"), "en")
+        self.language_combo.addItem(self._t("Khmer"), "km")
+        self.language_combo.setCurrentIndex(1 if self.config.language == "km" else 0)
+        grid.addWidget(self.language_combo, 9, 1, 1, 2)
+        save = QPushButton(self._t("Save preferences"))
         save.setObjectName("primaryButton")
         save.clicked.connect(self._save_settings)
-        grid.addWidget(save, 9, 2)
+        grid.addWidget(save, 10, 2)
         grid.setColumnStretch(1, 1)
         layout.addWidget(card)
         layout.addStretch(1)
         return page
+
+    def _build_donate_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        panel = QFrame()
+        panel.setObjectName("donatePanel")
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(28, 22, 28, 22)
+        panel_layout.setSpacing(10)
+        heading = QLabel("ឧបត្ថម Admin សម្រាប់កាហ្វេ")
+        heading.setObjectName("donateTitle")
+        heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        description = QLabel(self._t("Scan the ABA PAY QR code below to donate to Nava Seal Digital."))
+        description.setObjectName("muted")
+        description.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.donate_image = QLabel()
+        self.donate_image.setObjectName("donateImage")
+        self.donate_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.donate_image.setWordWrap(True)
+        self.donate_image.setMinimumHeight(360)
+        panel_layout.addWidget(heading)
+        panel_layout.addWidget(description)
+        panel_layout.addWidget(self.donate_image, 1)
+        layout.addWidget(panel)
+        QTimer.singleShot(0, self._refresh_donate_qr)
+        return page
+
+    @staticmethod
+    def _donate_qr_path() -> Path:
+        return Path(__file__).resolve().parent.parent / "resources" / "donate_qr.png"
+
+    def _refresh_donate_qr(self) -> None:
+        if not hasattr(self, "donate_image"):
+            return
+        pixmap = QPixmap(str(self._donate_qr_path()))
+        if pixmap.isNull():
+            self.donate_image.setPixmap(QPixmap())
+            self.donate_image.setText("Donation QR image is unavailable.")
+            return
+        self.donate_image.setText("")
+        width = max(260, min(560, self.donate_image.width() - 20))
+        height = max(340, self.donate_image.height() - 10)
+        self.donate_image.setPixmap(
+            pixmap.scaled(QSize(width, height), Qt.AspectRatioMode.KeepAspectRatio,
+                          Qt.TransformationMode.SmoothTransformation)
+        )
 
     def _new_table(self, headers: list[str]) -> QTableWidget:
         table = QTableWidget(0, len(headers))
@@ -726,11 +971,166 @@ class ModernWindow(QMainWindow):
     def _show_page(self, index: int) -> None:
         titles = [("Discover", "Explore the public Hongguo catalogue"),
                   ("My Queue", "Review dramas prepared for download"),
-                  ("Settings", "Manage local preferences")]
+                  ("My Library", "Browse and play downloaded videos"),
+                  ("Settings", "Manage local preferences"),
+                  ("Donate Admin", "Support the development of DeepXII Tools")]
         self.pages.setCurrentIndex(index)
-        self.page_title.setText(titles[index][0])
-        self.page_subtitle.setText(titles[index][1])
+        self._animate_page(self.pages.widget(index))
+        self.page_title.setText(self._t(titles[index][0]))
+        self.page_subtitle.setText(self._t(titles[index][1]))
         self.nav_buttons[index].setChecked(True)
+        if index == 2:
+            self._refresh_library()
+        elif index == 4:
+            self._refresh_donate_qr()
+
+    def _refresh_library(self, *_args: object) -> None:
+        self.library_items = scan_library(self.config.download_dir)
+        self._render_library()
+
+    def _render_library(self, *_args: object) -> None:
+        if not hasattr(self, "library_grid"):
+            return
+        while self.library_grid.count():
+            item = self.library_grid.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        self.library_thumbnail_labels.clear()
+        query = self.library_search.text().strip().lower()
+        items = [item for item in self.library_items if query in item.title.lower()]
+        sort_mode = str(self.library_sort.currentData() or "Newest")
+        if sort_mode == "Name":
+            items.sort(key=lambda item: item.title.lower())
+        elif sort_mode == "Most episodes":
+            items.sort(key=lambda item: item.episode_count, reverse=True)
+        elif sort_mode == "Largest size":
+            items.sort(key=lambda item: item.total_bytes, reverse=True)
+        else:
+            items.sort(key=lambda item: item.modified_at, reverse=True)
+        columns = max(1, (self.library_scroll.viewport().width() - 20) // 290)
+        for index, drama in enumerate(items):
+            card = QFrame()
+            card.setObjectName("libraryCard")
+            card.setFixedWidth(270)
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(9, 9, 9, 10)
+            card_layout.setSpacing(7)
+            cover = QLabel("▶  VIDEO LIBRARY")
+            cover.setObjectName("libraryCover")
+            cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            cover.setFixedSize(250, 138)
+            cover_path = drama.cover
+            pixmap = QPixmap(str(cover_path)) if cover_path else QPixmap()
+            if not pixmap.isNull():
+                cover.setText("")
+                cover.setPixmap(pixmap.scaled(cover.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                              Qt.TransformationMode.SmoothTransformation))
+            elif drama.videos:
+                key = str(drama.videos[0].resolve())
+                self.library_thumbnail_labels.setdefault(key, []).append(cover)
+                self._load_video_thumbnail(drama.videos[0], key)
+            card_layout.addWidget(cover)
+            title = QLabel(drama.title)
+            title.setObjectName("libraryTitle")
+            title.setWordWrap(True)
+            title.setToolTip(str(drama.folder))
+            card_layout.addWidget(title)
+            info = QLabel(f"{drama.episode_count} episodes  ·  {self._human_bytes(drama.total_bytes)}  ·  {drama.modified_text}")
+            info.setObjectName("muted")
+            info.setWordWrap(True)
+            card_layout.addWidget(info)
+            episodes = QComboBox()
+            for video in drama.videos:
+                episodes.addItem(video.stem, str(video))
+            card_layout.addWidget(episodes)
+            actions = QHBoxLayout()
+            play = QPushButton(f"▶ {self._t('Play')}")
+            play.setObjectName("primaryButton")
+            play.clicked.connect(lambda _checked=False, combo=episodes: self._play_selected_video(combo))
+            folder = QPushButton(self._t("Folder"))
+            folder.clicked.connect(lambda _checked=False, path=drama.folder: self._open_path(path))
+            delete = QPushButton(self._t("Delete"))
+            delete.setObjectName("dangerButton")
+            delete.clicked.connect(lambda _checked=False, item=drama: self._delete_library_drama(item))
+            actions.addWidget(play)
+            actions.addWidget(folder)
+            actions.addWidget(delete)
+            card_layout.addLayout(actions)
+            self.library_grid.addWidget(card, index // columns, index % columns)
+        total_videos = sum(item.episode_count for item in items)
+        total_size = sum(item.total_bytes for item in items)
+        self.library_summary.setText(
+            f"{len(items)} dramas · {total_videos} videos · {self._human_bytes(total_size)}"
+            if items else "No downloaded videos found."
+        )
+
+    def _load_video_thumbnail(self, video: Path, key: str) -> None:
+        cached = self.thumbnail_cache.get(key)
+        if cached is not None:
+            self._apply_library_thumbnail(key, cached)
+            return
+        if key in self.library_thumbnail_pending:
+            return
+        self.library_thumbnail_pending.add(key)
+        worker = VideoThumbnailWorker(video, key)
+        worker.signals.result.connect(self._video_thumbnail_ready)
+        worker.signals.finished.connect(lambda value=key: self.library_thumbnail_pending.discard(value))
+        self.thread_pool.start(worker)
+
+    @pyqtSlot(object)
+    def _video_thumbnail_ready(self, result: object) -> None:
+        if not isinstance(result, tuple) or len(result) != 2 or not result[1]:
+            return
+        key, path = str(result[0]), str(result[1])
+        pixmap = QPixmap(path)
+        if pixmap.isNull():
+            return
+        self.thumbnail_cache[key] = pixmap
+        self._apply_library_thumbnail(key, pixmap)
+
+    def _apply_library_thumbnail(self, key: str, pixmap: QPixmap) -> None:
+        for label in self.library_thumbnail_labels.get(key, []):
+            label.setText("")
+            label.setPixmap(pixmap.scaled(label.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                                          Qt.TransformationMode.SmoothTransformation))
+
+    def _play_selected_video(self, combo: QComboBox) -> None:
+        value = combo.currentData()
+        if value:
+            self._open_path(Path(str(value)))
+
+    def _open_path(self, path: Path) -> None:
+        path = path.expanduser()
+        if not path.exists():
+            QMessageBox.information(self, "Unavailable", "The selected file or folder no longer exists.")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
+    def _delete_library_drama(self, drama: LibraryDrama) -> None:
+        answer = QMessageBox.warning(
+            self,
+            "Delete downloaded videos",
+            f"Delete all {drama.episode_count} downloaded videos for ‘{drama.title}’?\n\nThis cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        failures = []
+        for video in drama.videos:
+            try:
+                video.unlink()
+            except OSError as exc:
+                failures.append(f"{video.name}: {exc}")
+        try:
+            if drama.folder.exists() and not any(drama.folder.iterdir()):
+                drama.folder.rmdir()
+        except OSError:
+            pass
+        self._refresh_library()
+        if failures:
+            QMessageBox.warning(self, "Some files were not deleted", "\n".join(failures[:5]))
 
     def _start_search(self) -> None:
         self.search_button.setEnabled(False)
@@ -790,6 +1190,8 @@ class ModernWindow(QMainWindow):
             self._load_thumbnail(cover_url)
             self.results_grid.addWidget(card, index // columns, index % columns)
         self._reflow_catalog()
+        if hasattr(self, "library_grid") and self.pages.currentIndex() == 2:
+            self._render_library()
         self.results_card.set_value(str(len(self.results)))
         self.search_status.setText(f"Found {len(self.results)} matching dramas.")
 
@@ -876,6 +1278,8 @@ class ModernWindow(QMainWindow):
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
         self.resize_timer.start(80)
+        if hasattr(self, "pages") and self.pages.currentIndex() == 4:
+            self._refresh_donate_qr()
 
     @pyqtSlot(str)
     def _show_search_error(self, message: str) -> None:
@@ -901,42 +1305,192 @@ class ModernWindow(QMainWindow):
         self._show_page(1)
 
     def _refresh_queue(self) -> None:
-        self.queue_table.setRowCount(len(self.queue))
-        for row, item in enumerate(self.queue):
+        tasks = self.download_manager.get_tasks()
+        grouped: dict[str, list] = {}
+        for task in tasks:
+            grouped.setdefault(task.book_id, []).append(task)
+        active_items = []
+        for queue_index, item in enumerate(self.queue):
+            drama_tasks = grouped.get(str(item.get("book_id")), [])
+            if drama_tasks and all(task.status == "done" for task in drama_tasks):
+                continue
+            active_items.append((queue_index, item, drama_tasks))
+        self._active_queue_indices = [entry[0] for entry in active_items]
+        self.queue_table.setRowCount(len(active_items))
+        self.queue_table.setVisible(bool(active_items))
+        if active_items:
+            self.queue_splitter.setSizes([260, 190])
+        for row, (queue_index, item, drama_tasks) in enumerate(active_items):
             self.queue_table.setItem(row, 0, QTableWidgetItem(str(item.get("title", "—"))))
             self.queue_table.setItem(row, 1, QTableWidgetItem(str(item.get("episode_total", "—"))))
             episode_match = re.search(r"(\d+)", str(item.get("episode_total") or ""))
             maximum = max(1, int(episode_match.group(1)) if episode_match else 1)
-            if "download_count" not in item:
-                item["download_count"] = maximum
-            count_spin = QSpinBox()
-            count_spin.setRange(1, maximum)
-            count_spin.setValue(min(maximum, int(item.get("download_count") or maximum)))
-            count_spin.setSuffix(" eps")
-            count_spin.valueChanged.connect(
-                lambda value, i=row: self.queue[i].__setitem__("download_count", value)
-            )
-            self.queue_table.setCellWidget(row, 2, count_spin)
+            item.setdefault("download_start", 1)
+            item.setdefault("download_end", int(item.get("download_count") or maximum))
+            range_widget = QWidget()
+            range_layout = QHBoxLayout(range_widget)
+            range_layout.setContentsMargins(2, 1, 2, 1)
+            start_spin, end_spin = QSpinBox(), QSpinBox()
+            for spin in (start_spin, end_spin):
+                spin.setRange(1, maximum)
+            start_spin.setValue(min(maximum, int(item.get("download_start") or 1)))
+            end_spin.setValue(min(maximum, max(start_spin.value(), int(item.get("download_end") or maximum))))
+            start_spin.setPrefix("EP ")
+            end_spin.setPrefix("to ")
+            start_spin.valueChanged.connect(lambda value, i=queue_index: self._set_episode_range(i, start=value))
+            end_spin.valueChanged.connect(lambda value, i=queue_index: self._set_episode_range(i, end=value))
+            range_layout.addWidget(start_spin)
+            range_layout.addWidget(end_spin)
+            self.queue_table.setCellWidget(row, 2, range_widget)
             self.queue_table.setItem(row, 3, QTableWidgetItem(str(item.get("book_id", "—"))))
             progress = QProgressBar()
             progress.setRange(0, 100)
             progress.setValue(0)
             progress.setFormat("0%")
             self.queue_table.setCellWidget(row, 4, progress)
-            tasks = [task for task in self.download_manager.get_tasks()
-                     if task.book_id == str(item.get("book_id"))]
-            done = sum(task.status == "done" for task in tasks)
-            if tasks:
-                percent = int(sum(task.progress for task in tasks) / len(tasks))
+            done = sum(task.status == "done" for task in drama_tasks)
+            if drama_tasks:
+                percent = int(sum(task.progress for task in drama_tasks) / len(drama_tasks))
                 progress.setValue(percent)
                 progress.setFormat(f"{percent}%")
-                status = f"Successful {done}/{len(tasks)}"
+                status = self._download_status_text(drama_tasks)
             else:
                 status = "Ready to download"
             self.queue_table.setItem(row, 5, QTableWidgetItem(status))
-            self._set_queue_actions(row, item, done > 0)
+            self._set_queue_actions(row, item, done > 0, queue_index)
+        self._refresh_completed_table(tasks)
         self.queue_card.set_value(str(len(self.queue)))
-        self.download_button.setEnabled(bool(self.queue))
+        self.download_button.setEnabled(bool(active_items))
+        self._update_queue_summary()
+
+    def _reorder_queue(self, source: int, target: int) -> None:
+        indices = getattr(self, "_active_queue_indices", [])
+        if not (0 <= source < len(indices) and 0 <= target < len(indices)):
+            return
+        source_index, target_index = indices[source], indices[target]
+        drama = self.queue.pop(source_index)
+        self.queue.insert(target_index, drama)
+        self._refresh_queue()
+        self.queue_table.selectRow(target)
+
+    def _refresh_completed_table(self, tasks: list) -> None:
+        completed = [task for task in tasks if task.status == "done" and task.save_path]
+        completed.sort(key=lambda task: (task.title.lower(), task.episode_num))
+        self.completed_table.setRowCount(len(completed))
+        for row, task in enumerate(completed):
+            self.completed_table.setRowHeight(row, 58)
+            path = Path(task.save_path)
+            size = task.total_bytes
+            if not size:
+                try:
+                    size = path.stat().st_size
+                except OSError:
+                    size = 0
+            self.completed_table.setItem(row, 0, QTableWidgetItem(task.title))
+            self.completed_table.setItem(row, 1, QTableWidgetItem(task.episode_title))
+            self.completed_table.setItem(row, 2, QTableWidgetItem(self._human_bytes(size)))
+            self.completed_table.setItem(row, 3, QTableWidgetItem(self._t("Completed")))
+            actions = QWidget()
+            actions.setObjectName("completedActions")
+            actions.setMinimumHeight(56)
+            action_layout = QHBoxLayout(actions)
+            action_layout.setContentsMargins(7, 7, 7, 7)
+            action_layout.setSpacing(8)
+            play = QPushButton(f"▶ {self._t('Play')}")
+            play.setObjectName("primaryButton")
+            play.setMinimumWidth(88)
+            play.setFixedHeight(34)
+            play.clicked.connect(lambda _checked=False, value=path: self._open_path(value))
+            folder = QPushButton(self._t("Folder"))
+            folder.setMinimumWidth(88)
+            folder.setFixedHeight(34)
+            folder.clicked.connect(lambda _checked=False, value=path.parent: self._open_path(value))
+            action_layout.addWidget(play)
+            action_layout.addWidget(folder)
+            self.completed_table.setCellWidget(row, 4, actions)
+
+    def _update_queue_summary(self) -> None:
+        if not hasattr(self, "queue_summary"):
+            return
+        tasks = self.download_manager.get_tasks()
+        active = [task for task in tasks if task.status in {"downloading", "retrying"}]
+        waiting = sum(task.status in {"pending", "paused", "stopped"} for task in tasks)
+        done = sum(task.status == "done" for task in tasks)
+        failed = sum(task.status == "error" for task in tasks)
+        speed = sum(task.speed for task in active)
+        eta = max((task.eta_seconds for task in active), default=0)
+        if self.config.language == "km":
+            text = f"សកម្ម {len(active)} · រង់ចាំ {waiting} · រួចរាល់ {done} · បរាជ័យ {failed}"
+            if speed:
+                text += f" · ល្បឿន {self._human_bytes(speed)}/s"
+            if eta:
+                text += f" · ពេលនៅសល់ {self._human_time(eta)}"
+        else:
+            text = f"Active {len(active)} · Waiting {waiting} · Completed {done} · Failed {failed}"
+            if speed:
+                text += f" · Speed {self._human_bytes(speed)}/s"
+            if eta:
+                text += f" · ETA {self._human_time(eta)}"
+        self.queue_summary.setText(text)
+
+    def _set_episode_range(self, index: int, start: int | None = None, end: int | None = None) -> None:
+        if not 0 <= index < len(self.queue):
+            return
+        if start is not None:
+            self.queue[index]["download_start"] = start
+            if start > int(self.queue[index].get("download_end") or start):
+                self.queue[index]["download_end"] = start
+        if end is not None:
+            self.queue[index]["download_end"] = end
+            if end < int(self.queue[index].get("download_start") or 1):
+                self.queue[index]["download_start"] = end
+
+    @staticmethod
+    def _human_bytes(value: float) -> str:
+        size = max(0.0, float(value))
+        for unit in ("B", "KB", "MB", "GB"):
+            if size < 1024 or unit == "GB":
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} GB"
+
+    @staticmethod
+    def _human_time(seconds: int) -> str:
+        seconds = max(0, int(seconds))
+        hours, remainder = divmod(seconds, 3600)
+        minutes, secs = divmod(remainder, 60)
+        return f"{hours:d}:{minutes:02d}:{secs:02d}" if hours else f"{minutes:02d}:{secs:02d}"
+
+    def _download_status_text(self, tasks: list) -> str:
+        done = sum(task.status == "done" for task in tasks)
+        speed = sum(task.speed for task in tasks if task.status in {"downloading", "retrying"})
+        downloaded = sum(task.downloaded_bytes for task in tasks)
+        total = sum(task.total_bytes for task in tasks)
+        eta = max((task.eta_seconds for task in tasks), default=0)
+        states = {task.status for task in tasks}
+        if "retrying" in states:
+            prefix = "Retrying"
+        elif "downloading" in states:
+            prefix = "Downloading"
+        elif states == {"done"}:
+            prefix = "Completed"
+        elif "paused" in states:
+            prefix = "Paused"
+        elif "error" in states:
+            failed = sum(task.status == "error" for task in tasks)
+            prefix = f"Failed {failed}"
+        elif "cancelled" in states:
+            prefix = "Cancelled"
+        else:
+            prefix = "Waiting"
+        details = f"{prefix} · Successful {done}/{len(tasks)}"
+        if total:
+            details += f" · {self._human_bytes(downloaded)}/{self._human_bytes(total)}"
+        if speed:
+            details += f" · {self._human_bytes(speed)}/s"
+        if eta:
+            details += f" · ETA {self._human_time(eta)}"
+        return details
 
     def _start_downloads(self) -> None:
         if not self.queue:
@@ -950,6 +1504,26 @@ class ModernWindow(QMainWindow):
         worker.signals.error.connect(self._download_prepare_error)
         worker.signals.finished.connect(self._download_prepare_finished)
         self.thread_pool.start(worker)
+
+    def _start_queue_drama(self, drama: dict[str, Any]) -> None:
+        book_id = str(drama.get("book_id") or "")
+        existing = [task for task in self.download_manager.get_tasks() if task.book_id == book_id]
+        if existing:
+            for task in existing:
+                self.download_manager.start_task(task.video_id)
+            return
+        worker = PrepareDownloadsWorker(self.download_manager, [dict(drama)])
+        worker.signals.result.connect(lambda _added, value=book_id: self._start_drama_tasks(value))
+        worker.signals.error.connect(self._download_prepare_error)
+        self.thread_pool.start(worker)
+
+    def _start_drama_tasks(self, book_id: str) -> None:
+        tasks = [task for task in self.download_manager.get_tasks() if task.book_id == book_id]
+        if not tasks:
+            QMessageBox.warning(self, "No episodes available", "The server returned no downloadable episodes.")
+            return
+        for task in tasks:
+            self.download_manager.start_task(task.video_id)
 
     @pyqtSlot(object)
     def _downloads_prepared(self, added: object) -> None:
@@ -993,33 +1567,35 @@ class ModernWindow(QMainWindow):
         tasks = [task for task in self.download_manager.get_tasks() if task.book_id == book_id]
         if not tasks:
             return
-        statuses = {task.status for task in tasks}
         done = sum(task.status == "done" for task in tasks)
         progress = sum(task.progress for task in tasks) / len(tasks)
-        if "downloading" in statuses:
-            text = f"Downloading · Successful {done}/{len(tasks)}"
-        elif statuses == {"done"}:
-            text = f"Completed · Successful {done}/{len(tasks)}"
-        elif "error" in statuses:
-            error = next((task.error_msg for task in tasks if task.error_msg), "Download failed")
-            text = f"Error: {error}"
-        else:
-            text = f"Waiting · {len(tasks)} episodes"
-        for row, drama in enumerate(self.queue):
+        text = self._download_status_text(tasks)
+        active_indices = getattr(self, "_active_queue_indices", list(range(len(self.queue))))
+        for row, queue_index in enumerate(active_indices):
+            if not 0 <= queue_index < len(self.queue):
+                continue
+            drama = self.queue[queue_index]
             if str(drama.get("book_id")) == book_id:
                 bar = self.queue_table.cellWidget(row, 4)
                 if isinstance(bar, QProgressBar):
                     bar.setValue(int(progress))
                     bar.setFormat(f"{progress:.0f}%")
                 self.queue_table.setItem(row, 5, QTableWidgetItem(text))
-                self._set_queue_actions(row, drama, done > 0)
+                self._set_queue_actions(row, drama, done > 0, queue_index)
                 break
+        self._update_queue_summary()
         completed_task = next(
             (task for task in tasks if task.video_id == video_id and task.status == "done"),
             None,
         )
         if completed_task is not None:
+            if all(task.status == "done" for task in tasks):
+                QTimer.singleShot(0, self._refresh_queue)
+            else:
+                self._refresh_completed_table(self.download_manager.get_tasks())
             self._queue_telegram_upload(completed_task.video_id, completed_task.save_path)
+            if self.pages.currentIndex() == 2:
+                QTimer.singleShot(100, self._refresh_library)
 
     @staticmethod
     def _telegram_target(value: str) -> str:
@@ -1066,23 +1642,61 @@ class ModernWindow(QMainWindow):
         self.telegram_uploading.discard(video_id)
         self.telegram_upload_status.setText(f"Telegram error: {message or value}")
 
-    def _set_queue_actions(self, row: int, drama: dict[str, Any], can_view: bool) -> None:
+    def _set_queue_actions(
+        self, row: int, drama: dict[str, Any], can_view: bool, queue_index: int | None = None
+    ) -> None:
         actions = QWidget()
         actions.setObjectName("tableActions")
         action_layout = QHBoxLayout(actions)
         action_layout.setContentsMargins(4, 2, 4, 2)
         action_layout.setSpacing(5)
+        start = QPushButton(self._t("Start"))
+        start.setObjectName("startQueueButton")
+        start.clicked.connect(lambda _checked=False, item=dict(drama): self._start_queue_drama(item))
+        action_layout.addWidget(start)
         if can_view:
-            view = QPushButton("View Folder")
+            view = QPushButton(self._t("View Folder"))
             view.setObjectName("viewFolderButton")
             view.clicked.connect(
                 lambda _checked=False, book_id=str(drama.get("book_id")): self._open_download_folder(book_id)
             )
             action_layout.addWidget(view)
-        remove = QPushButton("Remove")
-        remove.clicked.connect(lambda _checked=False, i=row: self._remove_queue_item(i))
+        remove = QPushButton(self._t("Remove"))
+        remove.setObjectName("dangerButton")
+        item_index = row if queue_index is None else queue_index
+        remove.clicked.connect(lambda _checked=False, i=item_index: self._remove_queue_item(i))
         action_layout.addWidget(remove)
         self.queue_table.setCellWidget(row, 6, actions)
+
+    def _pause_downloads(self) -> None:
+        self.download_manager.pause_all()
+        self.queue_notice.setText("Downloads paused. Partial files are preserved; click Resume to continue.")
+
+    def _cancel_downloads(self) -> None:
+        answer = QMessageBox.question(self, "Cancel downloads", "Cancel active downloads and delete partial files?")
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.download_manager.cancel_all()
+        self.queue_notice.setText("Downloads cancelled. Completed videos were kept.")
+
+    def _restore_persisted_queue(self) -> None:
+        known = {str(item.get("book_id")) for item in self.queue}
+        grouped: dict[str, list] = {}
+        for task in self.download_manager.get_tasks():
+            grouped.setdefault(task.book_id, []).append(task)
+        for book_id, tasks in grouped.items():
+            if book_id in known:
+                continue
+            numbers = [task.episode_num for task in tasks]
+            self.queue.append({
+                "book_id": book_id,
+                "title": tasks[0].title,
+                "episode_total": f"{max(numbers)} eps",
+                "download_start": min(numbers),
+                "download_end": max(numbers),
+            })
+        if hasattr(self, "queue_table"):
+            self._refresh_queue()
 
     def _open_download_folder(self, book_id: str) -> None:
         task = next(
@@ -1098,15 +1712,18 @@ class ModernWindow(QMainWindow):
 
     def _remove_queue_item(self, index: int) -> None:
         if 0 <= index < len(self.queue):
-            self.queue.pop(index)
+            drama = self.queue.pop(index)
+            self.download_manager.remove_drama(str(drama.get("book_id") or ""))
             self._refresh_queue()
 
     def _clear_queue(self) -> None:
+        for drama in list(self.queue):
+            self.download_manager.remove_drama(str(drama.get("book_id") or ""))
         self.queue.clear()
         self._refresh_queue()
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
-        self.download_manager.stop_all()
+        self.download_manager.shutdown(wait=True)
         self.aria2.stop()
         super().closeEvent(event)
 
@@ -1141,6 +1758,7 @@ class ModernWindow(QMainWindow):
         self.telegram_upload_status.setText("Telegram settings saved")
 
     def _save_settings(self) -> None:
+        previous_language = self.config.language
         folder = self.folder_edit.text().strip() or str(DEFAULT_DOWNLOAD_DIR)
         telegram_token = self.telegram_token_edit.text().strip()
         telegram_group = self.telegram_group_edit.text().strip()
@@ -1168,12 +1786,21 @@ class ModernWindow(QMainWindow):
         self.config.telegram_chat_id = telegram_group
         self.config.telegram_auto_send = telegram_auto
         self.config.github_repository = github_repository
+        self.config.language = str(self.language_combo.currentData() or "en")
         self.config.save()
         self.queue_telegram_token.setText(telegram_token)
         self.queue_telegram_group.setText(telegram_group)
         self.queue_telegram_auto.setChecked(telegram_auto)
         self._update_api_status()
-        QMessageBox.information(self, "Saved", "Preferences saved successfully.")
+        if previous_language != self.config.language:
+            message = (
+                "បានរក្សាទុកការកំណត់។ សូមបិទ និងបើកកម្មវិធីឡើងវិញ ដើម្បីប្រើភាសាថ្មី។"
+                if self.config.language == "km"
+                else "Preferences saved. Restart the application to use the new language."
+            )
+        else:
+            message = "បានរក្សាទុកការកំណត់ដោយជោគជ័យ។" if self.config.language == "km" else "Preferences saved successfully."
+        QMessageBox.information(self, "បានរក្សាទុក" if self.config.language == "km" else "Saved", message)
 
     def _update_api_status(self) -> None:
         if not hasattr(self, "api_status"):
@@ -1196,10 +1823,12 @@ def app_stylesheet(theme: str = "light") -> str:
     QMainWindow, QWidget#content { background: #080d1b; }
     QFrame#sidebar { background: #0c1326; border-right: 2px solid #00d9ff; }
     QLabel#brand { font-size: 19px; font-weight: 800; color: #ff2d75; }
-    QLabel#brandSub { font-size: 9px; font-weight: 650; color: #00eaff; letter-spacing: 0.5px; }
+    QLabel#brandSub { font-size: 12px; font-weight: 700; color: #00eaff; letter-spacing: 0.3px; }
     QLabel#contactLabel { color: #71809c; font-size: 10px; font-weight: 750; padding: 4px 12px; letter-spacing: 1px; }
     QLabel#pageTitle { font-size: 26px; font-weight: 750; color: #ffffff; }
     QLabel#muted { color: #8fa6c9; }
+    QLabel#queueSummary { color: #00d9ff; font-weight: 700; padding: 4px 8px; }
+    QLabel#completedTitle { color: #62f5bd; font-size: 14px; font-weight: 800; padding: 6px 4px 2px 4px; }
     QLabel#metricValue { font-size: 25px; font-weight: 800; }
     QLabel#fieldLabel { color: #c8d8f1; font-weight: 650; }
     QLabel#warningText { color: #ffd23f; }
@@ -1209,6 +1838,10 @@ def app_stylesheet(theme: str = "light") -> str:
     QWidget#catalogBar { background: transparent; }
     QWidget#catalogContainer { background: transparent; }
     QFrame#dramaCard { background: #111a31; border: 1px solid #263854; border-radius: 12px; }
+    QFrame#libraryCard { background: #111a31; border: 1px solid #263854; border-radius: 12px; }
+    QFrame#libraryCard:hover { border-color: #00eaff; }
+    QLabel#libraryCover { background: #0a1124; color: #71809c; border: 1px solid #263854; border-radius: 9px; font-weight: 800; }
+    QLabel#libraryTitle { font-size: 15px; font-weight: 750; }
     QFrame#dramaCard:hover { border: 2px solid #ff5b35; background: #15203a; }
     QLabel#cardCover { background: #18223a; color: #71809c; border: none; border-radius: 9px; font-size: 10px; }
     QLabel#cardTitle { font-weight: 650; padding: 0 2px; }
@@ -1229,31 +1862,42 @@ def app_stylesheet(theme: str = "light") -> str:
         background: #090d19; color: #b8c2d8; border: 1px solid #283148; font-weight: 750; }
     QPushButton#navButton[navRole="discover"] { color: #ff557d; border-color: #8f2149; }
     QPushButton#navButton[navRole="queue"] { color: #bd78ff; border-color: #63389b; }
+    QPushButton#navButton[navRole="library"] { color: #42f5b0; border-color: #168f6a; }
     QPushButton#navButton[navRole="settings"] { color: #43c7ff; border-color: #236e9c; }
     QPushButton#navButton[navRole="discover"]:hover { background: #2b1020; border-color: #ff2d75; color: #ffffff; }
     QPushButton#navButton[navRole="queue"]:hover { background: #211337; border-color: #a855f7; color: #ffffff; }
+    QPushButton#navButton[navRole="library"]:hover { background: #0b2f28; border-color: #42f5b0; color: #ffffff; }
     QPushButton#navButton[navRole="settings"]:hover { background: #0d2134; border-color: #22b8f0; color: #ffffff; }
     QPushButton#navButton[navRole="discover"]:checked { background: #ff245f; color: #ffffff; border: 1px solid #ff8cad; }
     QPushButton#navButton[navRole="queue"]:checked { background: #7c3cff; color: #ffffff; border: 1px solid #c4a0ff; }
+    QPushButton#navButton[navRole="library"]:checked { background: #0a9f70; color: #ffffff; border: 1px solid #72ffd1; }
     QPushButton#navButton[navRole="settings"]:checked { background: #087fab; color: #ffffff; border: 1px solid #68dcff; }
     QPushButton#updateButton { text-align: left; padding: 10px 14px; border-radius: 10px;
         background: #0b211d; color: #42f5b0; border: 1px solid #168f6a; font-weight: 750; }
     QPushButton#updateButton:hover { background: #0f3a30; color: #ffffff; border-color: #42f5b0; }
-    QPushButton#youtubeButton, QPushButton#telegramButton, QPushButton#donateButton { text-align: left; border: none; background: transparent; padding: 9px 14px; }
+    QPushButton#youtubeButton, QPushButton#telegramButton, QPushButton#websiteButton, QPushButton#donateButton { text-align: left; border: none; background: transparent; padding: 9px 14px; }
     QPushButton#youtubeButton { color: #ff4d5e; }
     QPushButton#telegramButton { color: #35bff3; }
+    QPushButton#websiteButton { color: #b879ff; }
     QPushButton#donateButton { color: #ff8a65; }
-    QPushButton#youtubeButton:hover, QPushButton#telegramButton:hover, QPushButton#donateButton:hover { background: #122342; }
-    QLabel#donateTitle { font-size: 22px; font-weight: 800; }
+    QPushButton#youtubeButton:hover, QPushButton#telegramButton:hover, QPushButton#websiteButton:hover, QPushButton#donateButton:hover { background: #122342; }
+    QPushButton#donateButton:checked { background: #ff6b4a; color: #ffffff; border-radius: 8px; }
+    QFrame#donatePanel { background: #111a31; border: 1px solid #263854; border-radius: 14px; }
+    QLabel#donateTitle { font-size: 32px; font-weight: 800; padding: 6px; }
+    QLabel#donateImage { background: #080e20; border: 1px solid #263854; border-radius: 12px; padding: 10px; }
     QPushButton#primaryButton { background: #16d66b; color: #04120a; border: 1px solid #b7ff2a; padding: 11px 18px; }
     QPushButton#primaryButton:hover { background: #3bea82; border-color: #e5ff87; }
     QPushButton#primaryButton:disabled { color: #657089; background: #151c2d; border-color: #303a50; }
     QPushButton#secondaryButton { background: #141d3b; color: #00f5d4; border-color: #00b8d9; }
+    QPushButton#startQueueButton { background: #123d31; color: #62f5bd; border-color: #1aa979; padding: 6px 9px; }
+    QPushButton#dangerButton { color: #ff718f; border-color: #a72b4c; padding: 7px 9px; }
+    QPushButton#dangerButton:hover { background: #451427; border-color: #ff4775; color: #ffffff; }
     QPushButton#catalogChip { border-radius: 14px; padding: 6px 11px; background: #151f36; color: #aebdd2; border-color: #34445e; }
     QPushButton#catalogChip:hover { border-color: #ff7a45; color: #ffffff; }
     QPushButton#catalogChip:checked { background: #ff6b24; color: #ffffff; border-color: #ff6b24; }
     QLineEdit, QSpinBox { background: #080e20; border: 1px solid #137c9b; border-radius: 8px;
         padding: 10px 12px; selection-background-color: #ff2d75; }
+    QComboBox { background: #080e20; border: 1px solid #137c9b; border-radius: 8px; padding: 8px 10px; }
     QLineEdit:focus, QSpinBox:focus { border-color: #00eaff; }
     QTableWidget { background: #0d1529; alternate-background-color: #101b34; border: 1px solid #137c9b;
         border-radius: 10px; gridline-color: transparent; outline: none; }
@@ -1265,6 +1909,129 @@ def app_stylesheet(theme: str = "light") -> str:
     QPushButton#viewFolderButton { color: #00f5d4; border-color: #00a8c9; padding: 6px 9px; }
     QHeaderView::section { background: #ff245f; color: #ffffff; border: none;
         border-bottom: 2px solid #00eaff; padding: 11px 8px; font-size: 11px; font-weight: 750; }
+    QHeaderView#completedHeader::section { background: #0a9f70; color: #ffffff; border-bottom-color: #42f5b0; }
+    /* Logo button palette: red, green and yellow */
+    QPushButton { background: #f5c400; color: #191500; border-color: #ffe36a; }
+    QPushButton:hover { background: #ffdc32; color: #191500; border-color: #fff19a; }
+    QPushButton:pressed { background: #d9aa00; }
+    QPushButton#primaryButton, QPushButton#startQueueButton, QPushButton#viewFolderButton {
+        background: #13a94b; color: #ffffff; border-color: #46dc7c; }
+    QPushButton#primaryButton:hover, QPushButton#startQueueButton:hover, QPushButton#viewFolderButton:hover {
+        background: #20c85d; color: #ffffff; border-color: #83f2aa; }
+    QPushButton#secondaryButton, QPushButton#themeButton {
+        background: #f5c400; color: #191500; border-color: #ffe36a; }
+    QPushButton#dangerButton { background: #e32636; color: #ffffff; border-color: #ff6975; }
+    QPushButton#dangerButton:hover { background: #ff3948; color: #ffffff; border-color: #ff9aa2; }
+    QPushButton#navButton[navRole="discover"] { background: #3b1117; color: #ff5966; border-color: #e32636; }
+    QPushButton#navButton[navRole="queue"], QPushButton#navButton[navRole="settings"] {
+        background: #332a08; color: #ffd426; border-color: #d9aa00; }
+    QPushButton#navButton[navRole="library"] { background: #0d3020; color: #45dc7d; border-color: #13a94b; }
+    QPushButton#navButton[navRole="discover"]:checked { background: #e32636; color: #ffffff; border-color: #ff6975; }
+    QPushButton#navButton[navRole="queue"]:checked, QPushButton#navButton[navRole="settings"]:checked {
+        background: #f5c400; color: #191500; border-color: #ffe36a; }
+    QPushButton#navButton[navRole="library"]:checked { background: #13a94b; color: #ffffff; border-color: #46dc7c; }
+    QPushButton#updateButton { background: #13a94b; color: #ffffff; border-color: #46dc7c; }
+    QPushButton#updateButton:hover { background: #20c85d; color: #ffffff; border-color: #83f2aa; }
+    QPushButton#youtubeButton { color: #ff5966; }
+    QPushButton#telegramButton { color: #45dc7d; }
+    QPushButton#websiteButton { color: #ffd426; }
+    QPushButton#donateButton { color: #ff5966; }
+    QPushButton#catalogChip { background: #332a08; color: #ffd426; border-color: #d9aa00; }
+    QPushButton#catalogChip:checked { background: #e32636; color: #ffffff; border-color: #ff6975; }
+    /* Neon capsule style inspired by the reference UI */
+    QPushButton { border-radius: 15px; padding: 7px 15px; min-height: 18px; font-weight: 800; }
+    QPushButton:hover { border: 2px solid #ffffff; padding: 6px 14px; }
+    QPushButton#primaryButton, QPushButton#startQueueButton, QPushButton#viewFolderButton {
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00b84a, stop:1 #b7e400);
+        color: #071408; border: 2px solid #79ff9f; }
+    QPushButton#secondaryButton, QPushButton#themeButton {
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ffad00, stop:1 #ffe23b);
+        color: #251800; border: 2px solid #fff09a; }
+    QPushButton#dangerButton {
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d8102f, stop:1 #ff4d51);
+        color: #ffffff; border: 2px solid #ff8b91; }
+    QPushButton#navButton { border-radius: 17px; border-width: 2px; padding: 10px 14px; }
+    QPushButton#navButton[navRole="discover"] { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #39101a,stop:1 #711329); }
+    QPushButton#navButton[navRole="queue"], QPushButton#navButton[navRole="settings"] {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #3d2b00,stop:1 #705900); }
+    QPushButton#navButton[navRole="library"] { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #07341d,stop:1 #08693a); }
+    QPushButton#updateButton {
+        border-radius: 16px; border-width: 2px;
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #00a647,stop:1 #a8d900); }
+    QPushButton#youtubeButton, QPushButton#telegramButton, QPushButton#websiteButton, QPushButton#donateButton {
+        background: #11182b; border-width: 1px; border-style: solid; border-radius: 14px; padding: 7px 13px; margin: 1px 0; }
+    QPushButton#youtubeButton, QPushButton#donateButton { border-color: #ff4055; }
+    QPushButton#telegramButton { border-color: #31df7c; }
+    QPushButton#websiteButton { border-color: #ffd426; }
+    QPushButton#catalogChip { border-radius: 15px; border-width: 2px; padding: 5px 12px; }
+    QWidget#tableActions QPushButton { border-radius: 12px; min-height: 16px; padding: 4px 10px; }
+    QWidget#completedActions QPushButton { border-radius: 12px; min-height: 18px; max-height: 22px; padding: 3px 10px; }
+    /* Reference neon palette: cyan, blue, pink, purple, lime, orange */
+    QMainWindow, QWidget#content { background: #080b1d; }
+    QFrame#sidebar { background: #0d1128; border-right-color: #00e5ff; }
+    QFrame#metricCard, QFrame#panel, QFrame#telegramPanel {
+        background: #151936; border-color: #00cfff; }
+    QFrame#notice { background: #18143a; border-color: #8b5cff; }
+    QLabel#telegramTitle, QLabel#queueSummary { color: #00e5ff; }
+    QLabel#completedTitle { color: #7cff4f; }
+    QPushButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #0077ff,stop:1 #00d9ff);
+        color: #ffffff; border-color: #65f3ff; }
+    QPushButton#primaryButton, QPushButton#startQueueButton, QPushButton#viewFolderButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #00c96b,stop:1 #8cff00);
+        color: #07150a; border-color: #aaff6b; }
+    QPushButton#secondaryButton, QPushButton#themeButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #ff8a00,stop:1 #ffe23b);
+        color: #251500; border-color: #fff08b; }
+    QPushButton#dangerButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #ff176b,stop:1 #ff3d44);
+        color: #ffffff; border-color: #ff8fb4; }
+    QPushButton#navButton[navRole="discover"] {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #072d4e,stop:1 #005f7d);
+        color: #56edff; border-color: #00d9ff; }
+    QPushButton#navButton[navRole="queue"] {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #2d155b,stop:1 #6836bd);
+        color: #e1c8ff; border-color: #a768ff; }
+    QPushButton#navButton[navRole="library"] {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #073821,stop:1 #087d45);
+        color: #7cff9c; border-color: #35ef83; }
+    QPushButton#navButton[navRole="settings"] {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #073462,stop:1 #096eb5);
+        color: #75d8ff; border-color: #22b8ff; }
+    QPushButton#navButton[navRole="discover"]:checked {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #00a9d6,stop:1 #0077ff); }
+    QPushButton#navButton[navRole="queue"]:checked {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7b2cff,stop:1 #d12dff); color: #ffffff; }
+    QPushButton#navButton[navRole="library"]:checked {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #00b95d,stop:1 #76e900); }
+    QPushButton#navButton[navRole="settings"]:checked {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #006cd9,stop:1 #00cfff); }
+    QPushButton#updateButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #6d31e8,stop:1 #ff2da5);
+        color: #ffffff; border-color: #ff76c9; }
+    QPushButton#youtubeButton { color: #ff4f9a; border-color: #ff2d75; }
+    QPushButton#telegramButton { color: #39efff; border-color: #00d9ff; }
+    QPushButton#websiteButton { color: #75aaff; border-color: #347dff; }
+    QPushButton#donateButton {
+        color: #ffffff; border-color: #ff9a4d;
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #ff8a00,stop:1 #ff2d75); }
+    QPushButton#donateButton:hover, QPushButton#donateButton:checked {
+        color: #ffffff; border-color: #ffffff;
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #ffad20,stop:1 #ff4aa0); }
+    QPushButton#catalogChip { background: #15264a; color: #5de9ff; border-color: #00bfe8; }
+    QPushButton#catalogChip:checked {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #ff2d75,stop:1 #a72cff); border-color: #ff86c2; }
+    QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #00e5ff,stop:1 #77ff00); }
+    QHeaderView::section {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #ff2169,stop:1 #a72cff);
+        border-bottom-color: #00e5ff; }
+    QHeaderView#completedHeader::section {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #00a85a,stop:1 #00bfcf);
+        border-bottom-color: #76ff80; }
+    QLabel#statusBadge {
+        color: #eafff7; border-color: #5dffd2;
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #087d45,stop:1 #007f9e); }
+    QScrollBar::handle:vertical { background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #00d9ff,stop:1 #a72cff); }
     QScrollBar:vertical { background: #091126; width: 10px; }
     QScrollBar::handle:vertical { background: #00a8c9; border-radius: 5px; min-height: 30px; }
     """
@@ -1277,11 +2044,16 @@ def app_stylesheet(theme: str = "light") -> str:
     QLabel#brandSub { color: #087f9b; }
     QLabel#pageTitle { color: #101828; }
     QLabel#muted { color: #64748b; }
+    QLabel#queueSummary { color: #087f9b; }
+    QLabel#completedTitle { color: #08775a; }
     QLabel#fieldLabel { color: #344054; }
     QLabel#warningText { color: #a15c00; }
     QLabel#contactLabel { color: #7a8699; }
     QLabel#coverThumbnail { background: #edf1f5; color: #7a8699; border-color: #cbd5e1; }
     QFrame#dramaCard { background: #ffffff; border-color: #d7cfc8; }
+    QFrame#libraryCard { background: #ffffff; border-color: #cbd5e1; }
+    QFrame#libraryCard:hover { border-color: #0891b2; }
+    QLabel#libraryCover { background: #edf1f5; color: #64748b; border-color: #cbd5e1; }
     QFrame#dramaCard:hover { background: #fffaf6; border-color: #ff6b35; }
     QLabel#cardCover { background: #edf1f5; color: #7a8699; }
     QLabel#cardEpisodes { color: #6c625b; }
@@ -1298,19 +2070,25 @@ def app_stylesheet(theme: str = "light") -> str:
     QPushButton#navButton { background: #111827; border-color: #344158; }
     QPushButton#navButton[navRole="discover"]:hover { background: #3a1225; }
     QPushButton#navButton[navRole="queue"]:hover { background: #281642; }
+    QPushButton#navButton[navRole="library"]:hover { background: #0b3028; }
     QPushButton#navButton[navRole="settings"]:hover { background: #102a40; }
     QPushButton#updateButton { background: #eafff7; color: #08775a; border-color: #35b890; }
     QPushButton#updateButton:hover { background: #cffff0; color: #064c3c; border-color: #0aa978; }
-    QPushButton#youtubeButton:hover, QPushButton#telegramButton:hover, QPushButton#donateButton:hover { background: #edf6fa; }
+    QPushButton#youtubeButton:hover, QPushButton#telegramButton:hover, QPushButton#websiteButton:hover, QPushButton#donateButton:hover { background: #edf6fa; }
+    QPushButton#donateButton:checked { background: #ff7657; color: #ffffff; }
+    QFrame#donatePanel { background: #ffffff; border-color: #b9d5e2; }
+    QLabel#donateImage { background: #f7fafc; border-color: #cbd5e1; }
     QPushButton#primaryButton { background: #16c96a; color: #04120a; border-color: #0fa958; }
     QPushButton#primaryButton:hover { background: #31dc7d; border-color: #087443; }
     QPushButton#primaryButton:disabled { color: #98a2b3; background: #e4e7ec; border-color: #cbd2dc; }
     QPushButton#secondaryButton { background: #f0fffc; color: #087f72; border-color: #16a6b6; }
+    QPushButton#startQueueButton { background: #e9fff6; color: #08775a; border-color: #35b890; }
+    QPushButton#dangerButton { background: #fff1f3; color: #b42348; border-color: #f3a2b5; }
     QPushButton#catalogChip { background: #ffffff; color: #5f554f; border-color: #ddcec3; }
     QPushButton#catalogChip:hover { background: #fff8f2; color: #c94c13; border-color: #ff7a45; }
     QPushButton#catalogChip:checked { background: #ff6b24; color: #ffffff; border-color: #ff6b24; }
     QPushButton#themeButton { min-width: 78px; }
-    QLineEdit, QSpinBox { background: #ffffff; border-color: #9cb3c9; }
+    QLineEdit, QSpinBox, QComboBox { background: #ffffff; border-color: #9cb3c9; }
     QLineEdit:focus, QSpinBox:focus { border-color: #0891b2; }
     QTableWidget { background: #ffffff; alternate-background-color: #f7f9fc; border-color: #9ccbd7; }
     QTableWidget::item { border-bottom-color: #e2e8f0; }
@@ -1319,6 +2097,108 @@ def app_stylesheet(theme: str = "light") -> str:
     QProgressBar::chunk { background: #18c66c; }
     QPushButton#viewFolderButton { background: #effffc; color: #087f72; border-color: #16a6b6; }
     QHeaderView::section { background: #ff245f; color: #ffffff; border-bottom-color: #00b8d9; }
+    QHeaderView#completedHeader::section { background: #12a66f; color: #ffffff; border-bottom-color: #08775a; }
+    /* Light logo button palette */
+    QPushButton { background: #ffd426; color: #211b00; border-color: #d9aa00; }
+    QPushButton:hover { background: #ffe15a; color: #211b00; border-color: #b98f00; }
+    QPushButton:pressed { background: #edbd00; }
+    QPushButton#primaryButton, QPushButton#startQueueButton, QPushButton#viewFolderButton {
+        background: #16b957; color: #ffffff; border-color: #07863b; }
+    QPushButton#primaryButton:hover, QPushButton#startQueueButton:hover, QPushButton#viewFolderButton:hover {
+        background: #20ce66; color: #ffffff; border-color: #087a39; }
+    QPushButton#secondaryButton, QPushButton#themeButton {
+        background: #ffd426; color: #211b00; border-color: #d9aa00; }
+    QPushButton#dangerButton { background: #e32636; color: #ffffff; border-color: #b71523; }
+    QPushButton#dangerButton:hover { background: #f43b49; color: #ffffff; border-color: #9e101c; }
+    QPushButton#navButton[navRole="discover"] { background: #351116; color: #ff6571; border-color: #e32636; }
+    QPushButton#navButton[navRole="queue"], QPushButton#navButton[navRole="settings"] {
+        background: #3a3009; color: #ffe15a; border-color: #d9aa00; }
+    QPushButton#navButton[navRole="library"] { background: #0c3320; color: #55e58a; border-color: #16b957; }
+    QPushButton#navButton[navRole="discover"]:checked { background: #e32636; color: #ffffff; border-color: #b71523; }
+    QPushButton#navButton[navRole="queue"]:checked, QPushButton#navButton[navRole="settings"]:checked {
+        background: #ffd426; color: #211b00; border-color: #d9aa00; }
+    QPushButton#navButton[navRole="library"]:checked { background: #16b957; color: #ffffff; border-color: #07863b; }
+    QPushButton#updateButton { background: #16b957; color: #ffffff; border-color: #07863b; }
+    QPushButton#updateButton:hover { background: #20ce66; color: #ffffff; border-color: #087a39; }
+    QPushButton#youtubeButton { color: #e32636; }
+    QPushButton#telegramButton { color: #0c9c47; }
+    QPushButton#websiteButton { color: #b18800; }
+    QPushButton#donateButton { color: #e32636; }
+    QPushButton#catalogChip { background: #fff7c7; color: #715800; border-color: #d9aa00; }
+    QPushButton#catalogChip:checked { background: #e32636; color: #ffffff; border-color: #b71523; }
+    /* Neon capsule style on the light surface */
+    QPushButton { border-radius: 15px; padding: 7px 15px; min-height: 18px; font-weight: 800; }
+    QPushButton:hover { border: 2px solid #ffffff; padding: 6px 14px; }
+    QPushButton#primaryButton, QPushButton#startQueueButton, QPushButton#viewFolderButton {
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0dbb50, stop:1 #b9e51a);
+        color: #071408; border: 2px solid #07863b; }
+    QPushButton#secondaryButton, QPushButton#themeButton {
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ffb000, stop:1 #ffe34d);
+        color: #251800; border: 2px solid #c49400; }
+    QPushButton#dangerButton {
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d8102f, stop:1 #ff5156);
+        color: #ffffff; border: 2px solid #a80e25; }
+    QPushButton#navButton { border-radius: 17px; border-width: 2px; padding: 10px 14px; }
+    QPushButton#navButton[navRole="discover"] { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #2d1118,stop:1 #661126); }
+    QPushButton#navButton[navRole="queue"], QPushButton#navButton[navRole="settings"] {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #3b2c04,stop:1 #6b5707); }
+    QPushButton#navButton[navRole="library"] { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #08351e,stop:1 #087442); }
+    QPushButton#updateButton {
+        border-radius: 16px; border-width: 2px;
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #0bac4b,stop:1 #b4df19); }
+    QPushButton#youtubeButton, QPushButton#telegramButton, QPushButton#websiteButton, QPushButton#donateButton {
+        background: #ffffff; border-width: 1px; border-style: solid; border-radius: 14px; padding: 7px 13px; margin: 1px 0; }
+    QPushButton#youtubeButton, QPushButton#donateButton { border-color: #e32636; }
+    QPushButton#telegramButton { border-color: #16a653; }
+    QPushButton#websiteButton { border-color: #c79b00; }
+    QPushButton#catalogChip { border-radius: 15px; border-width: 2px; padding: 5px 12px; }
+    QWidget#tableActions QPushButton { border-radius: 12px; min-height: 16px; padding: 4px 10px; }
+    QWidget#completedActions QPushButton { border-radius: 12px; min-height: 18px; max-height: 22px; padding: 3px 10px; }
+    /* Reference neon colors retained on the light surface */
+    QFrame#metricCard, QFrame#panel, QFrame#telegramPanel { border-color: #35bfe8; }
+    QPushButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #087bea,stop:1 #00cde8);
+        color: #ffffff; border-color: #0067c6; }
+    QPushButton#primaryButton, QPushButton#startQueueButton, QPushButton#viewFolderButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #0abb59,stop:1 #83df00);
+        color: #07150a; border-color: #07853e; }
+    QPushButton#secondaryButton, QPushButton#themeButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #ff9700,stop:1 #ffdd35);
+        color: #251500; border-color: #c37a00; }
+    QPushButton#dangerButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #f31265,stop:1 #f43d43);
+        color: #ffffff; border-color: #b90c43; }
+    QPushButton#navButton[navRole="discover"] { background: #073d62; color: #63eaff; border-color: #00bfe8; }
+    QPushButton#navButton[navRole="queue"] { background: #48237f; color: #e1c8ff; border-color: #9b5de5; }
+    QPushButton#navButton[navRole="library"] { background: #075c32; color: #8cffae; border-color: #17bc65; }
+    QPushButton#navButton[navRole="settings"] { background: #07558d; color: #8cddff; border-color: #159ddb; }
+    QPushButton#navButton[navRole="discover"]:checked { background: #008dca; color: #ffffff; }
+    QPushButton#navButton[navRole="queue"]:checked { background: #8a35df; color: #ffffff; }
+    QPushButton#navButton[navRole="library"]:checked { background: #13aa54; color: #ffffff; }
+    QPushButton#navButton[navRole="settings"]:checked { background: #087fc5; color: #ffffff; }
+    QPushButton#updateButton {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7136df,stop:1 #f32b9c);
+        color: #ffffff; border-color: #a62a94; }
+    QPushButton#youtubeButton { color: #e91e63; border-color: #e91e63; }
+    QPushButton#telegramButton { color: #008eae; border-color: #00aeca; }
+    QPushButton#websiteButton { color: #216bd5; border-color: #347dff; }
+    QPushButton#donateButton {
+        color: #ffffff; border-color: #dc6817;
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #ff8a00,stop:1 #ec2876); }
+    QPushButton#donateButton:hover, QPushButton#donateButton:checked {
+        color: #ffffff; border-color: #b34e11;
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #ffa51f,stop:1 #f34491); }
+    QPushButton#catalogChip { background: #e8faff; color: #087a9a; border-color: #00aeca; }
+    QPushButton#catalogChip:checked { background: #ef2877; color: #ffffff; border-color: #a72cff; }
+    QHeaderView::section {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #f51f67,stop:1 #9630df);
+        color: #ffffff; border-bottom-color: #00bcd4; }
+    QHeaderView#completedHeader::section {
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #0aa85c,stop:1 #00aebd);
+        color: #ffffff; border-bottom-color: #08775a; }
+    QLabel#statusBadge {
+        color: #ffffff; border-color: #087f72;
+        background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #12a85d,stop:1 #0296a8); }
     QScrollBar:vertical { background: #edf2f7; }
     QScrollBar::handle:vertical { background: #52a9bc; }
     """
