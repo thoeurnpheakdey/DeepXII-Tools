@@ -147,7 +147,7 @@ app = BUNDLE(
     icon=icon_path,
     bundle_identifier='com.hongguo.downloader',
     info_plist={
-        'CFBundleShortVersionString': '1.0.0',
+        'CFBundleShortVersionString': '1.0.1',
         'NSHighResolutionCapable': True,
         'NSRequiresAquaSystemAppearance': False,  # support dark mode
     },

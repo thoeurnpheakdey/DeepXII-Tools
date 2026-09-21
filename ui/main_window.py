@@ -24,7 +24,7 @@ from ui.settings_dialog import SettingsDialog
 from ui.settings_tab import SettingsTab
 
 
-APP_VERSION = "1.0.0"
+from version import APP_VERSION
 
 
 

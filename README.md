@@ -108,3 +108,18 @@ python cli.py batch --file batch.txt --quality 1080P+ --dir D:\Hongguo
 Completed episode files are skipped, so rerunning the same command resumes the
 queue without downloading those files again. Concurrency is limited to 1-10
 episodes per drama to avoid overwhelming the service.
+
+## Publishing an update
+
+Pushing commits to `main` does not publish an application update. The in-app
+updater reads the latest published GitHub Release. Update `APP_VERSION` in
+`version.py`, commit and push the changes, then create and push a matching tag:
+
+```powershell
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+The `Release Windows` GitHub Actions workflow builds and publishes
+`DeepXII-Tools-Setup.exe` together with its SHA-256 checksum. Existing builds
+will then detect the newer release from the **Update Tools** button.
