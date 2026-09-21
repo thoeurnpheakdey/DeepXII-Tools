@@ -15,6 +15,7 @@ DEFAULT_DOWNLOAD_DIR = Path.home() / "Downloads" / "红果下载"
 DEFAULT_LEVEL = "1080P+"
 DEFAULT_THEME = "light"
 DEFAULT_LANGUAGE = "en"
+DEFAULT_ACTIVATION_BOT_USERNAME = "deepxiiactivate_bot"
 MIN_CONCURRENT = 1
 MAX_CONCURRENT = 10
 
@@ -62,6 +63,8 @@ class Config:
     telegram_chat_id: str = ""
     telegram_auto_send: bool = False
     github_repository: str = "thoeurnpheakdey/DeepXII-Tools"
+    activation_code: str = ""
+    activation_bot_username: str = DEFAULT_ACTIVATION_BOT_USERNAME
 
     CONFIG_DIR: ClassVar[Path] = CONFIG_DIR_PATH
     CONFIG_FILE: ClassVar[Path] = CONFIG_FILE_PATH
@@ -114,6 +117,8 @@ class Config:
             telegram_chat_id=str(data.get("telegram_chat_id", "")),
             telegram_auto_send=_coerce_bool(data.get("telegram_auto_send")),
             github_repository=str(data.get("github_repository") or "thoeurnpheakdey/DeepXII-Tools"),
+            activation_code=str(data.get("activation_code", "")),
+            activation_bot_username=str(data.get("activation_bot_username") or DEFAULT_ACTIVATION_BOT_USERNAME),
         )
 
         stored = {
@@ -129,6 +134,8 @@ class Config:
             "telegram_chat_id": data.get("telegram_chat_id", ""),
             "telegram_auto_send": _coerce_bool(data.get("telegram_auto_send")),
             "github_repository": data.get("github_repository") or "thoeurnpheakdey/DeepXII-Tools",
+            "activation_code": data.get("activation_code", ""),
+            "activation_bot_username": data.get("activation_bot_username") or DEFAULT_ACTIVATION_BOT_USERNAME,
         }
         if (
             needs_save
@@ -143,6 +150,8 @@ class Config:
             or stored["telegram_chat_id"] != config.telegram_chat_id
             or stored["telegram_auto_send"] != config.telegram_auto_send
             or stored["github_repository"] != config.github_repository
+            or stored["activation_code"] != config.activation_code
+            or stored["activation_bot_username"] != config.activation_bot_username
         ):
             config.save()
         return config
@@ -161,6 +170,8 @@ class Config:
             "telegram_chat_id": self.telegram_chat_id,
             "telegram_auto_send": self.telegram_auto_send,
             "github_repository": self.github_repository,
+            "activation_code": self.activation_code,
+            "activation_bot_username": self.activation_bot_username,
         }
         try:
             self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)

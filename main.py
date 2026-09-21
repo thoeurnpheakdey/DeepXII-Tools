@@ -15,6 +15,8 @@ from config import Config
 from core.api_client import HonguoClient
 from core.aria2_manager import Aria2Manager
 from core.download_manager import DownloadManager
+from core.license_manager import verify_activation_code
+from ui.activation_dialog import ActivationDialog
 from ui.modern_window import ModernWindow, app_stylesheet
 
 
@@ -25,6 +27,12 @@ def main() -> None:
     app.setStyle("Fusion")
     config = Config.load()
     app.setStyleSheet(app_stylesheet(config.theme))
+
+    activated, _license, _message = verify_activation_code(config.activation_code, config.machine_id)
+    if not activated:
+        activation = ActivationDialog(config)
+        if activation.exec() != ActivationDialog.DialogCode.Accepted:
+            return
 
     client = HonguoClient(config)
     aria2 = Aria2Manager(config)
