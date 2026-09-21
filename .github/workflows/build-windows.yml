@@ -2,203 +2,52 @@ name: Build Windows
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out source
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+          cache: pip
 
-      - name: Install dependencies
+      - name: Install build dependencies
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          python -m pip install -r requirements.txt pyinstaller pillow
 
-      - name: Prepare PyInstaller specs
-        shell: bash
+      - name: Compile Python sources
+        shell: pwsh
+        run: python -m compileall -q main.py config.py core ui
+
+      - name: Build standalone Windows executable
+        shell: pwsh
+        run: python -m PyInstaller --clean --noconfirm build_windows_onefile.spec
+
+      - name: Create SHA-256 checksum
+        shell: pwsh
         run: |
-          cat <<'PYEOF' > build_win.spec
-# -*- mode: python ; coding: utf-8 -*-
-import os
-from PyInstaller.utils.hooks import collect_all
+          $hash = (Get-FileHash -Algorithm SHA256 "dist\DeepXIITools.exe").Hash.ToLower()
+          "$hash  DeepXIITools.exe" | Set-Content -Encoding ascii "dist\DeepXIITools.exe.sha256"
 
-block_cipher = None
-
-pyside6_datas, pyside6_binaries, pyside6_hidden = collect_all('PySide6')
-
-icon_path = None
-for candidate in (
-    'resources/icon.ico',
-    'resources/icon.icns',
-    'resources/icon.png',
-):
-    if os.path.exists(candidate):
-        icon_path = candidate
-        break
-
-extra_binaries = []
-aria2_path = 'resources/aria2/win/aria2c.exe'
-if os.path.exists(aria2_path):
-    extra_binaries.append((aria2_path, 'resources/aria2/win'))
-
-binaries = pyside6_binaries + extra_binaries
-
-datas = pyside6_datas + [
-    ('resources', 'resources'),
-]
-
-hiddenimports = pyside6_hidden + [
-    'aria2p',
-    'psutil',
-    'requests',
-    'websocket',
-    'filelock',
-]
-
-a = Analysis(
-    ['main.py'],
-    pathex=['.'],
-    binaries=binaries,
-    datas=datas,
-    hiddenimports=hiddenimports,
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
-)
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='红果短剧下载器',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=icon_path,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='红果短剧下载器',
-)
-PYEOF
-
-          cat <<'PYEOF' > build_cli_win.spec
-# -*- mode: python ; coding: utf-8 -*-
-import os
-
-block_cipher = None
-
-extra_binaries = []
-aria2_path = 'resources/aria2/win/aria2c.exe'
-if os.path.exists(aria2_path):
-    extra_binaries.append((aria2_path, 'resources/aria2/win'))
-
-binaries = extra_binaries
-
-datas = [
-    ('resources', 'resources'),
-]
-
-hiddenimports = [
-    'aria2p',
-    'psutil',
-    'requests',
-    'websocket',
-    'filelock',
-]
-
-a = Analysis(
-    ['cli.py'],
-    pathex=['.'],
-    binaries=binaries,
-    datas=datas,
-    hiddenimports=hiddenimports,
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
-)
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='hongguo-cli',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='hongguo-cli',
-)
-PYEOF
-
-      - name: Build GUI
-        run: pyinstaller build_win.spec --noconfirm
-
-      - name: Build CLI
-        run: pyinstaller build_cli_win.spec --noconfirm
-
-      - name: Upload GUI artifact
+      - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: hongguo-gui-windows
-          path: dist/红果短剧下载器
-
-      - name: Upload CLI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: hongguo-cli-windows
-          path: dist/hongguo-cli
+          name: DeepXIITools-Windows
+          path: |
+            dist/DeepXIITools.exe
+            dist/DeepXIITools.exe.sha256
+          if-no-files-found: error
