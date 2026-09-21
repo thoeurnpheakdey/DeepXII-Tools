@@ -1,3 +1,3 @@
 """Application version. Release builds replace this value from the Git tag."""
 
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"

@@ -116,8 +116,8 @@ updater reads the latest published GitHub Release. Update `APP_VERSION` in
 `version.py`, commit and push the changes, then create and push a matching tag:
 
 ```powershell
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.0.2
+git push origin v1.0.2
 ```
 
 The `Release Windows` GitHub Actions workflow builds and publishes
