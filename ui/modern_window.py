@@ -33,6 +33,7 @@ KHMER_TRANSLATIONS = {
     "Donate Admin": "ឧបត្ថម្ភ Admin",
     "Update Tools": "អាប់ដេតកម្មវិធី",
     "YouTube": "YouTube",
+    "Facebook": "Facebook",
     "Telegram": "Telegram",
     "Website": "គេហទំព័រ",
     "CONTACT": "ទំនាក់ទំនង",
@@ -425,6 +426,14 @@ class ModernWindow(QMainWindow):
         youtube.clicked.connect(
             lambda: QDesktopServices.openUrl(QUrl("https://www.youtube.com/@NavaSealDigital"))
         )
+        facebook = QPushButton(f"f  {self._t('Facebook')}")
+        facebook.setObjectName("facebookButton")
+        facebook.setCursor(Qt.CursorShape.PointingHandCursor)
+        facebook.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl("https://www.facebook.com/navasealSoftDeveloper")
+            )
+        )
         telegram = QPushButton(f"➤  {self._t('Telegram')}")
         telegram.setObjectName("telegramButton")
         telegram.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -445,6 +454,7 @@ class ModernWindow(QMainWindow):
         self.nav_group.addButton(donate)
         self.nav_buttons.append(donate)
         layout.addWidget(youtube)
+        layout.addWidget(facebook)
         layout.addWidget(telegram)
         layout.addWidget(website)
         layout.addWidget(donate)
@@ -855,7 +865,7 @@ class ModernWindow(QMainWindow):
         grid.addWidget(browse, 0, 2)
         grid.addWidget(self._field_label(self._t("Concurrent episodes")), 1, 0)
         self.concurrent_spin = QSpinBox()
-        self.concurrent_spin.setRange(1, 10)
+        self.concurrent_spin.setRange(1, 16)
         self.concurrent_spin.setValue(self.config.concurrent)
         grid.addWidget(self.concurrent_spin, 1, 1)
         grid.addWidget(self._field_label(self._t("Preferred quality")), 2, 0)
@@ -1875,12 +1885,13 @@ def app_stylesheet(theme: str = "light") -> str:
     QPushButton#updateButton { text-align: left; padding: 10px 14px; border-radius: 10px;
         background: #0b211d; color: #42f5b0; border: 1px solid #168f6a; font-weight: 750; }
     QPushButton#updateButton:hover { background: #0f3a30; color: #ffffff; border-color: #42f5b0; }
-    QPushButton#youtubeButton, QPushButton#telegramButton, QPushButton#websiteButton, QPushButton#donateButton { text-align: left; border: none; background: transparent; padding: 9px 14px; }
+    QPushButton#youtubeButton, QPushButton#facebookButton, QPushButton#telegramButton, QPushButton#websiteButton, QPushButton#donateButton { text-align: left; border: none; background: transparent; padding: 9px 14px; }
     QPushButton#youtubeButton { color: #ff4d5e; }
+    QPushButton#facebookButton { color: #5b9dff; }
     QPushButton#telegramButton { color: #35bff3; }
     QPushButton#websiteButton { color: #b879ff; }
     QPushButton#donateButton { color: #ff8a65; }
-    QPushButton#youtubeButton:hover, QPushButton#telegramButton:hover, QPushButton#websiteButton:hover, QPushButton#donateButton:hover { background: #122342; }
+    QPushButton#youtubeButton:hover, QPushButton#facebookButton:hover, QPushButton#telegramButton:hover, QPushButton#websiteButton:hover, QPushButton#donateButton:hover { background: #122342; }
     QPushButton#donateButton:checked { background: #ff6b4a; color: #ffffff; border-radius: 8px; }
     QFrame#donatePanel { background: #111a31; border: 1px solid #263854; border-radius: 14px; }
     QLabel#donateTitle { font-size: 32px; font-weight: 800; padding: 6px; }
@@ -1933,6 +1944,7 @@ def app_stylesheet(theme: str = "light") -> str:
     QPushButton#updateButton { background: #13a94b; color: #ffffff; border-color: #46dc7c; }
     QPushButton#updateButton:hover { background: #20c85d; color: #ffffff; border-color: #83f2aa; }
     QPushButton#youtubeButton { color: #ff5966; }
+    QPushButton#facebookButton { color: #4f8ff7; }
     QPushButton#telegramButton { color: #45dc7d; }
     QPushButton#websiteButton { color: #ffd426; }
     QPushButton#donateButton { color: #ff5966; }
@@ -1958,9 +1970,10 @@ def app_stylesheet(theme: str = "light") -> str:
     QPushButton#updateButton {
         border-radius: 16px; border-width: 2px;
         background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #00a647,stop:1 #a8d900); }
-    QPushButton#youtubeButton, QPushButton#telegramButton, QPushButton#websiteButton, QPushButton#donateButton {
+    QPushButton#youtubeButton, QPushButton#facebookButton, QPushButton#telegramButton, QPushButton#websiteButton, QPushButton#donateButton {
         background: #11182b; border-width: 1px; border-style: solid; border-radius: 14px; padding: 7px 13px; margin: 1px 0; }
     QPushButton#youtubeButton, QPushButton#donateButton { border-color: #ff4055; }
+    QPushButton#facebookButton { border-color: #4f8ff7; }
     QPushButton#telegramButton { border-color: #31df7c; }
     QPushButton#websiteButton { border-color: #ffd426; }
     QPushButton#catalogChip { border-radius: 15px; border-width: 2px; padding: 5px 12px; }
@@ -2010,6 +2023,7 @@ def app_stylesheet(theme: str = "light") -> str:
         background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #6d31e8,stop:1 #ff2da5);
         color: #ffffff; border-color: #ff76c9; }
     QPushButton#youtubeButton { color: #ff4f9a; border-color: #ff2d75; }
+    QPushButton#facebookButton { color: #70a7ff; border-color: #347dff; }
     QPushButton#telegramButton { color: #39efff; border-color: #00d9ff; }
     QPushButton#websiteButton { color: #75aaff; border-color: #347dff; }
     QPushButton#donateButton {
@@ -2074,7 +2088,7 @@ def app_stylesheet(theme: str = "light") -> str:
     QPushButton#navButton[navRole="settings"]:hover { background: #102a40; }
     QPushButton#updateButton { background: #eafff7; color: #08775a; border-color: #35b890; }
     QPushButton#updateButton:hover { background: #cffff0; color: #064c3c; border-color: #0aa978; }
-    QPushButton#youtubeButton:hover, QPushButton#telegramButton:hover, QPushButton#websiteButton:hover, QPushButton#donateButton:hover { background: #edf6fa; }
+    QPushButton#youtubeButton:hover, QPushButton#facebookButton:hover, QPushButton#telegramButton:hover, QPushButton#websiteButton:hover, QPushButton#donateButton:hover { background: #edf6fa; }
     QPushButton#donateButton:checked { background: #ff7657; color: #ffffff; }
     QFrame#donatePanel { background: #ffffff; border-color: #b9d5e2; }
     QLabel#donateImage { background: #f7fafc; border-color: #cbd5e1; }
@@ -2121,6 +2135,7 @@ def app_stylesheet(theme: str = "light") -> str:
     QPushButton#updateButton { background: #16b957; color: #ffffff; border-color: #07863b; }
     QPushButton#updateButton:hover { background: #20ce66; color: #ffffff; border-color: #087a39; }
     QPushButton#youtubeButton { color: #e32636; }
+    QPushButton#facebookButton { color: #1877f2; }
     QPushButton#telegramButton { color: #0c9c47; }
     QPushButton#websiteButton { color: #b18800; }
     QPushButton#donateButton { color: #e32636; }
@@ -2146,9 +2161,10 @@ def app_stylesheet(theme: str = "light") -> str:
     QPushButton#updateButton {
         border-radius: 16px; border-width: 2px;
         background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #0bac4b,stop:1 #b4df19); }
-    QPushButton#youtubeButton, QPushButton#telegramButton, QPushButton#websiteButton, QPushButton#donateButton {
+    QPushButton#youtubeButton, QPushButton#facebookButton, QPushButton#telegramButton, QPushButton#websiteButton, QPushButton#donateButton {
         background: #ffffff; border-width: 1px; border-style: solid; border-radius: 14px; padding: 7px 13px; margin: 1px 0; }
     QPushButton#youtubeButton, QPushButton#donateButton { border-color: #e32636; }
+    QPushButton#facebookButton { border-color: #1877f2; }
     QPushButton#telegramButton { border-color: #16a653; }
     QPushButton#websiteButton { border-color: #c79b00; }
     QPushButton#catalogChip { border-radius: 15px; border-width: 2px; padding: 5px 12px; }
@@ -2180,6 +2196,7 @@ def app_stylesheet(theme: str = "light") -> str:
         background: qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #7136df,stop:1 #f32b9c);
         color: #ffffff; border-color: #a62a94; }
     QPushButton#youtubeButton { color: #e91e63; border-color: #e91e63; }
+    QPushButton#facebookButton { color: #1877f2; border-color: #1877f2; }
     QPushButton#telegramButton { color: #008eae; border-color: #00aeca; }
     QPushButton#websiteButton { color: #216bd5; border-color: #347dff; }
     QPushButton#donateButton {

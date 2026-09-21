@@ -84,7 +84,7 @@ class SettingsTab(QWidget):
         form.addRow("下载目录", dir_row)
 
         self.concurrent_spin = QSpinBox()
-        self.concurrent_spin.setRange(1, 10)
+        self.concurrent_spin.setRange(1, 16)
         form.addRow("并发数", self.concurrent_spin)
 
         self.level_combo = QComboBox()

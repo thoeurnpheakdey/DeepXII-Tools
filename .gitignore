@@ -8,6 +8,4 @@ dist/
 .env
 third_party/
 release/
-admin/license_private_key.pem
-admin/activation_bot.db
-admin/bot.env
+activation_keys/

@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Dict, Optional, TYPE_CHECKING
@@ -25,6 +26,7 @@ class Aria2Manager:
         self._client: Optional[aria2p.Client] = None
         self._api: Optional[aria2p.API] = None
         self._last_error: str = ""
+        self._start_lock = threading.RLock()
 
     def _detect_binary(self) -> Optional[Path]:
         project_root = Path(__file__).resolve().parent.parent
@@ -64,6 +66,10 @@ class Aria2Manager:
             return False
 
     def start(self) -> bool:
+        with self._start_lock:
+            return self._start_locked()
+
+    def _start_locked(self) -> bool:
         if self._rpc_alive():
             return True
         binary = self._binary_path or self._detect_binary()
@@ -71,26 +77,34 @@ class Aria2Manager:
             self._last_error = "未找到 aria2c 可执行文件"
             return False
         self._binary_path = binary
+        concurrent = max(1, min(16, int(getattr(self.config, "concurrent", 6) or 6)))
         args = [
             str(binary),
             "--enable-rpc=true",
             f"--rpc-listen-port={self.rpc_port}",
             "--rpc-listen-all=false",
+            f"--max-concurrent-downloads={concurrent}",
             "--max-connection-per-server=16",
             "--split=16",
             "--min-split-size=1M",
             "--piece-length=1M",
             "--file-allocation=none",
-            "--disk-cache=64M",
+            "--disk-cache=128M",
             "--stream-piece-selector=geom",
-            "--connect-timeout=15",
+            "--connect-timeout=10",
             "--timeout=60",
             "--lowest-speed-limit=10K",
+            "--max-overall-download-limit=0",
+            "--max-download-limit=0",
+            "--async-dns=true",
             "--http-accept-gzip=true",
             "--http-no-cache=true",
             "--reuse-uri=true",
             "--allow-overwrite=true",
             "--auto-file-renaming=false",
+            "--summary-interval=0",
+            "--console-log-level=warn",
+            "--download-result=hide",
         ]
         try:
             self._process = subprocess.Popen(
@@ -152,6 +166,7 @@ class Aria2Manager:
             "min-split-size": "1M",
             "piece-length": "1M",
             "file-allocation": "none",
+            "disk-cache": "128M",
             "stream-piece-selector": "geom",
             "max-tries": "3",
             "retry-wait": "2",

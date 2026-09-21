@@ -14,6 +14,34 @@ The desktop interface includes a live public-catalogue search, selectable drama
 results, a local queue, and preferences. Download actions remain disabled until
 an authorized endpoint is configured.
 
+## Offline application activation
+
+Create the signing keys once on the Admin computer:
+
+```powershell
+python activate.py init
+```
+
+Keep `activation_keys/license_private_key.pem` private and back it up. The public
+key in `resources/license_public_key.pem` is bundled with the application.
+
+When a user opens the tool for the first time, they copy the displayed Machine
+ID and send it to the Admin. For interactive use, run this and paste the Machine
+ID when prompted:
+
+```powershell
+python activate.py
+```
+
+The equivalent one-line command is:
+
+```powershell
+python activate.py generate USER_MACHINE_ID
+```
+
+Send the single generated code back to the user. It works only on the computer
+whose Machine ID was supplied. Telegram and a web activation server are not used.
+
 ## Setup (Windows PowerShell)
 
 ```powershell
@@ -78,5 +106,6 @@ python cli.py batch --file batch.txt --quality 1080P+ --dir D:\Hongguo
 ```
 
 Completed episode files are skipped, so rerunning the same command resumes the
-queue without downloading those files again. Concurrency is limited to 1-10
-episodes per drama to avoid overwhelming the service.
+queue without downloading those files again. The optimized default is 6
+concurrent episodes and can be adjusted from 1-16 to match the available
+internet connection and server capacity.

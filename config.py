@@ -15,9 +15,9 @@ DEFAULT_DOWNLOAD_DIR = Path.home() / "Downloads" / "红果下载"
 DEFAULT_LEVEL = "1080P+"
 DEFAULT_THEME = "light"
 DEFAULT_LANGUAGE = "en"
-DEFAULT_ACTIVATION_BOT_USERNAME = "deepxiiactivate_bot"
 MIN_CONCURRENT = 1
-MAX_CONCURRENT = 10
+MAX_CONCURRENT = 16
+DEFAULT_CONCURRENT = 6
 
 
 def _generate_machine_id() -> str:
@@ -29,7 +29,7 @@ def _coerce_concurrent(value: Any) -> int:
     try:
         numeric = int(value)
     except (TypeError, ValueError):
-        numeric = 3
+        numeric = DEFAULT_CONCURRENT
     return max(MIN_CONCURRENT, min(MAX_CONCURRENT, numeric))
 
 
@@ -54,7 +54,7 @@ class Config:
     key: str = ""
     machine_id: str = field(default_factory=_generate_machine_id)
     download_dir: str = field(default_factory=lambda: str(DEFAULT_DOWNLOAD_DIR))
-    concurrent: int = 3
+    concurrent: int = DEFAULT_CONCURRENT
     use_motrix: bool = False
     level: str = DEFAULT_LEVEL
     theme: str = DEFAULT_THEME
@@ -64,7 +64,6 @@ class Config:
     telegram_auto_send: bool = False
     github_repository: str = "thoeurnpheakdey/DeepXII-Tools"
     activation_code: str = ""
-    activation_bot_username: str = DEFAULT_ACTIVATION_BOT_USERNAME
 
     CONFIG_DIR: ClassVar[Path] = CONFIG_DIR_PATH
     CONFIG_FILE: ClassVar[Path] = CONFIG_FILE_PATH
@@ -108,7 +107,7 @@ class Config:
             key=str(data.get("key", "")),
             machine_id=str(data.get("machine_id") or _generate_machine_id()),
             download_dir=data.get("download_dir") or str(DEFAULT_DOWNLOAD_DIR),
-            concurrent=data.get("concurrent", 3),
+            concurrent=data.get("concurrent", DEFAULT_CONCURRENT),
             use_motrix=_coerce_bool(data.get("use_motrix")),
             level=data.get("level") or DEFAULT_LEVEL,
             theme=data.get("theme") or DEFAULT_THEME,
@@ -118,14 +117,13 @@ class Config:
             telegram_auto_send=_coerce_bool(data.get("telegram_auto_send")),
             github_repository=str(data.get("github_repository") or "thoeurnpheakdey/DeepXII-Tools"),
             activation_code=str(data.get("activation_code", "")),
-            activation_bot_username=str(data.get("activation_bot_username") or DEFAULT_ACTIVATION_BOT_USERNAME),
         )
 
         stored = {
             "key": data.get("key", ""),
             "machine_id": data.get("machine_id"),
             "download_dir": data.get("download_dir"),
-            "concurrent": _coerce_concurrent(data.get("concurrent", 3)),
+            "concurrent": _coerce_concurrent(data.get("concurrent", DEFAULT_CONCURRENT)),
             "use_motrix": _coerce_bool(data.get("use_motrix")),
             "level": data.get("level") or DEFAULT_LEVEL,
             "theme": data.get("theme") or DEFAULT_THEME,
@@ -135,7 +133,6 @@ class Config:
             "telegram_auto_send": _coerce_bool(data.get("telegram_auto_send")),
             "github_repository": data.get("github_repository") or "thoeurnpheakdey/DeepXII-Tools",
             "activation_code": data.get("activation_code", ""),
-            "activation_bot_username": data.get("activation_bot_username") or DEFAULT_ACTIVATION_BOT_USERNAME,
         }
         if (
             needs_save
@@ -151,7 +148,6 @@ class Config:
             or stored["telegram_auto_send"] != config.telegram_auto_send
             or stored["github_repository"] != config.github_repository
             or stored["activation_code"] != config.activation_code
-            or stored["activation_bot_username"] != config.activation_bot_username
         ):
             config.save()
         return config
@@ -171,7 +167,6 @@ class Config:
             "telegram_auto_send": self.telegram_auto_send,
             "github_repository": self.github_repository,
             "activation_code": self.activation_code,
-            "activation_bot_username": self.activation_bot_username,
         }
         try:
             self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
