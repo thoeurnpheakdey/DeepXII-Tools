@@ -865,7 +865,7 @@ class ModernWindow(QMainWindow):
         grid.addWidget(browse, 0, 2)
         grid.addWidget(self._field_label(self._t("Concurrent episodes")), 1, 0)
         self.concurrent_spin = QSpinBox()
-        self.concurrent_spin.setRange(1, 16)
+        self.concurrent_spin.setRange(1, 10)
         self.concurrent_spin.setValue(self.config.concurrent)
         grid.addWidget(self.concurrent_spin, 1, 1)
         grid.addWidget(self._field_label(self._t("Preferred quality")), 2, 0)

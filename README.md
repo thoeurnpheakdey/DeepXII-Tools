@@ -106,6 +106,5 @@ python cli.py batch --file batch.txt --quality 1080P+ --dir D:\Hongguo
 ```
 
 Completed episode files are skipped, so rerunning the same command resumes the
-queue without downloading those files again. The optimized default is 6
-concurrent episodes and can be adjusted from 1-16 to match the available
-internet connection and server capacity.
+queue without downloading those files again. Concurrency is limited to 1-10
+episodes per drama to avoid overwhelming the service.

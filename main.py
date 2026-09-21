@@ -9,6 +9,7 @@ PROJECT_ROOT = Path(__file__).parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
 from config import Config
@@ -24,6 +25,7 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("DeepXII Tools")
     app.setOrganizationName("Nava Seal Digital")
+    app.setWindowIcon(QIcon(str(PROJECT_ROOT / "resources" / "app_icon.png")))
     app.setStyle("Fusion")
     config = Config.load()
     app.setStyleSheet(app_stylesheet(config.theme))

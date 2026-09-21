@@ -52,7 +52,7 @@ class QueueTab(QWidget):
         self.count_label = QLabel("待下载: 0 | 下载中: 0 | 已完成: 0")
         self.concurrent_label = QLabel("并发数:")
         self.concurrent_spin = QSpinBox()
-        self.concurrent_spin.setRange(1, 16)
+        self.concurrent_spin.setRange(1, 10)
         self.concurrent_spin.setValue(self.config.concurrent)
         self.concurrent_spin.valueChanged.connect(self._on_concurrent_changed)
 

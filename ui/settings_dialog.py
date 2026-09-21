@@ -74,7 +74,7 @@ class SettingsDialog(QDialog):
 
         # 并发数
         self.concurrent_spin = QSpinBox()
-        self.concurrent_spin.setRange(1, 16)
+        self.concurrent_spin.setRange(1, 10)
         form.addRow("并发数", self.concurrent_spin)
 
         # 清晰度

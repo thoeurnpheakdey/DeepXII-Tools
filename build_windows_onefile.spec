@@ -1,9 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
+binaries = collect_dynamic_libs('PyQt6')
 datas = [('resources', 'resources')]
-binaries = []
-binaries += collect_dynamic_libs('PyQt6')
 
 a = Analysis(
     ['main.py'],
@@ -21,8 +20,9 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='DeepXIITools',
     icon='resources/app_icon.png',
     debug=False,
@@ -31,13 +31,4 @@ exe = EXE(
     upx=True,
     console=False,
     disable_windowed_traceback=False,
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='DeepXIITools',
 )

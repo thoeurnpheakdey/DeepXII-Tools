@@ -77,34 +77,26 @@ class Aria2Manager:
             self._last_error = "未找到 aria2c 可执行文件"
             return False
         self._binary_path = binary
-        concurrent = max(1, min(16, int(getattr(self.config, "concurrent", 6) or 6)))
         args = [
             str(binary),
             "--enable-rpc=true",
             f"--rpc-listen-port={self.rpc_port}",
             "--rpc-listen-all=false",
-            f"--max-concurrent-downloads={concurrent}",
             "--max-connection-per-server=16",
             "--split=16",
             "--min-split-size=1M",
             "--piece-length=1M",
             "--file-allocation=none",
-            "--disk-cache=128M",
+            "--disk-cache=64M",
             "--stream-piece-selector=geom",
-            "--connect-timeout=10",
+            "--connect-timeout=15",
             "--timeout=60",
             "--lowest-speed-limit=10K",
-            "--max-overall-download-limit=0",
-            "--max-download-limit=0",
-            "--async-dns=true",
             "--http-accept-gzip=true",
             "--http-no-cache=true",
             "--reuse-uri=true",
             "--allow-overwrite=true",
             "--auto-file-renaming=false",
-            "--summary-interval=0",
-            "--console-log-level=warn",
-            "--download-result=hide",
         ]
         try:
             self._process = subprocess.Popen(
@@ -166,7 +158,6 @@ class Aria2Manager:
             "min-split-size": "1M",
             "piece-length": "1M",
             "file-allocation": "none",
-            "disk-cache": "128M",
             "stream-piece-selector": "geom",
             "max-tries": "3",
             "retry-wait": "2",
